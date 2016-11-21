@@ -1,0 +1,68 @@
+<?php
+
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+/**
+ *
+ * @author Administrator
+ */
+class TextRetrieval extends TpmsDB {
+
+	
+
+	/**
+	 * 访问外部接口
+	 */
+	public function getDefaultLocation($text_str,$orgCode)
+	{
+                $orgCode6 = substr($orgCode,0,6);
+		if ($this->dbconn == null)
+			$this->dbconn = $this->LogonDB();
+		$sql="select QUERY_TABLE_NAME from QUERY_TABLE";
+                $tablename = "JQDZ_MASTER";
+                $stmt = oci_parse($this->dbconn, $sql);
+		if (!@oci_execute($stmt)) {
+			echo getOciError($stmt);
+			oci_close($this->dbconn);
+			exit; 
+		}else{
+			
+			while (($row = oci_fetch_assoc($stmt)) != false) {
+				$tablename=$row["QUERY_TABLE_NAME"];
+			}
+		}
+		$text_str = iconv("UTF-8","GBK",$text_str);
+		$sql = "select * from (select  y.* from ".$tablename." y where contains(DZ, key_split('$text_str'), 1) > 0 and xzqh='$orgCode6' order by score(1) desc) where rownum<10";
+		//echo $sql;
+		$stmt = oci_parse($this->dbconn, $sql);
+		if (!@oci_execute($stmt)) {
+			echo getOciError($stmt);
+			oci_close($this->dbconn);
+			exit; 
+		}else{
+			$arrs = array();
+			while (($row = oci_fetch_assoc($stmt)) != false) {
+				$arr = array(
+					'dz' => iconv("GBK","UTF-8",$row["DZ"]),
+					'zbx' => iconv("GBK","UTF-8",$row["ZBX"]),	
+					'zby' => iconv("GBK","UTF-8",$row["ZBY"])
+					
+				);
+				array_push($arrs, $arr);
+			}
+		}
+                $res=array('data' => $arrs);
+		oci_free_statement($stmt);
+		oci_close($this->dbconn);
+		return $res;
+	
+	}
+	
+	
+	
+}
+?>

@@ -1,0 +1,54 @@
+<script type="text/javascript">
+function ACTION(){
+	var p=this;
+	var footBox;
+	var mainMenu;
+	
+	this.READY=function(){
+		var menuOption={"noCenterBlank":true,"iconAlign":"right","top":"7px","left":"0px","bottom":"","right":"27px","expdir":"top","width":36,"height":36};
+		mainMenu=new DeskMenu(p.find(".mainmenu_topright"),101,menuOption);
+		mainMenu.loadMenu("php/system/GetRole_web.php");
+		$(mainMenu).bind("MENU_CLICK",function(e,Vars){
+				WINDOW.open(Vars["option"],null,Vars["but"]);
+		})	
+		
+		
+		$(WEBCHAT).bind("CHAT_ADDUSER",addUser);//添加用户事件监听
+                $(WEBCHAT).bind("CHAT_CREATGROUP",function(e){
+                	WINDOW.open({"name":"window_006","width":600,"height":600,"url":"pages/zhdd/zhddIM.html","title":"合成作战","position":"left_top","toggle":false});
+                	});//添加用户事件监听
+                $(WEBCHAT).bind("CHAT_ADDINFO",function(e,groupinfo){
+			//打开警情事件
+			//alert("打开警情详情："+groupinfo["jingqing"])
+                        //console.log(groupinfo);
+                          var postData={
+								"event":"",
+								"extend":{},
+								"content":{"condition":{"jqbh":groupinfo["jingqing"]}}
+                                };
+                        var Loader=new AJAXObj();
+                        $(Loader).bind("JSON_LOADED",function(e,backJson){	
+                                var rowData = backJson.value;
+                                if(rowData){
+                                      //console.log(rowData.records);
+                                       WINDOW.open({"name":"IMopenJq","width":800,"height":400,"url":"pages/zhdd/eventViewLBC.html","title":"警情详细",'position':'left_bottom'},{"record":rowData.records[0]},$(this));
+                                }else{
+                                        $.message("该警情不存在!");
+                                }
+                        });
+                         Loader.POSTDATA("php/event/GetSimpleById.php",postData);
+		})
+	}	
+	
+	function addUser(e,obj){
+            
+            var groupid=obj["GID"];
+            var groupName=obj["groupname"];
+            var WinID='zhddIMAddUser';
+            //alert(groupid);
+            WINDOW.open({"name":WinID,"width":600,"height":500,"url":"pages/zhdd/zhddIMAddUser.html","title":"新增用户->"+groupName,"position":"left_center","locksize":true},{"groupid":groupid,"groupName":groupName});
+        }
+
+}
+</script>
+<div class="mainmenu_topright"></div>

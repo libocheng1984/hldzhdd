@@ -1,0 +1,134 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	var record=null;
+	var parentId=null;
+	var groups = null;
+	var eventRecord = null;
+	
+	//窗口缩放尺寸设置
+	this.resize=function(){
+		p.find(".datalist").height(p.WRAPER.height()-p.find(".submitButs").outerHeight(true));
+		p.find("#tt").datagrid("resize"); 
+	}
+	
+	
+	this.READY=function(){
+		parentId = p.CONDITION["winId"];
+		groups = p.CONDITION['groups'];
+		eventRecord = p.CONDITION['eventRecord'];
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",function(e,option){ 
+			p.resize();
+		})
+		
+		//表格例子------------------------------------------EasyUI组件
+		var clumoption=[[
+			{field:'gid',title:'',width:20,align:"center",checkbox:true},
+			{field:'parentName',title:'分局名称',width:"25%",align:"center"},
+			{field:'orgName',title:'派出所名称',width:"25%",align:"center"},
+			{field:'hphm',title:'号牌号码',width:"15%",align:"center"},
+			{field:'userName',title:'指挥员',width:"14%",align:"center"},
+			{field:'status',title:'状态',width:"14%",align:"center",formatter:function(value,record,index){
+                 if(value=="1"){
+                 	return "巡逻";
+                 }else if(value=="2"){
+                 	return "执勤";
+                 }else if(value=="3"){
+                 	return "解散";
+                 }	
+              }}
+			
+			]];
+	
+		p.find("#tt").datagrid({
+			fit:true,
+			showFooter:true,//显示总计??
+			rownumbers:true,//行号
+			singleSelect:true,
+			fitColumns:true,//宽度自适应
+			striped:true,//条纹
+			pagination:false,//分页
+			columns:clumoption
+		})
+		p.find("#tt").datagrid("loadData",groups)
+		p.find("#saveButton").bind("click",SaveForm);
+		//更新一下尺寸
+		p.resize();
+		
+	}
+	
+	function SaveForm(){
+		var data = p.find("#tt").datagrid("getSelected");
+		if(!data){
+			$.message("请选择一个车辆!");
+			return;
+		}
+			eventRecord['hphm_event']=data['hphm'];
+		var mhjqzb = eventRecord['mhjqzb'];
+		if(eventRecord['jqjqzb']){
+			mhjqzb = eventRecord['jqjqzb'];
+		}
+		
+		var postData={
+					"event":"STATION",
+					"extend":{"eventswitch":"load"},
+					"content":{"condition":{
+									"jqid":eventRecord['jqid'],
+									"mhjqzb":mhjqzb,
+									"orgCode":eventRecord['gxdwdm_event'],
+									"hphm":eventRecord['hphm_event'],
+									"bjnr":eventRecord['bjnr'],
+									"jqdd":eventRecord['jqdd'],
+									"zlnr":eventRecord['zlnr']
+								}}
+				};
+			p.find("#saveButton").unbind();
+			var Loader=new AJAXObj();
+			$(Loader).bind("JSON_LOADED",function(e,backJson){	
+				if(backJson['head']['code']==1){
+					if(backJson['value']['result']=='true'){
+						//$.message("派警成功!");
+						$.message(backJson['value']['errmsg'],100000);
+						WINDOW.close(p.WINID);
+						WINDOW.close(parentId);
+					}else{
+						$.message(backJson['value']['errmsg'],100000);
+						WINDOW.close(p.WINID);
+					}
+				}
+			});
+			$(Loader).bind("SYS_ERROR",function(e,msg){
+				p.find("#saveButton").bind("click",SaveForm);
+				$.error("该派警失败!");
+			});
+			Loader.POSTDATA("php/event/AddCommandEvent_web.php",postData);	
+	}
+	
+	
+	//子窗口刷新父页面
+	this.refesh=function(){
+		p.find("#tt").datagrid("reload");
+	}
+	
+	this.getMsgFromChild=function(msg){
+		WINDOW.closeSide();//关闭侧面内容
+		$.alert(msg)	
+	}
+
+}
+</script>
+
+<!--表格-->
+<div class="datalist">
+  <div id="tt"> </div>
+</div>
+<!--内容部分end--> 
+<div class="submitButs"><a  id="saveButton" class="but-normal but-red"><i class="fa fa-save"></i> 确认</a></div>
+
+
+

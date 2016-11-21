@@ -1,0 +1,95 @@
+<script type="text/javascript">
+function ACTION(){
+	var p=this;	
+	var SubmitForm;
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		p.find(".detailBox").height(p.WRAPER.height()-p.find(".submitButs").outerHeight(true))
+	}		
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){  
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);	
+		//返回按钮事件
+		p.find("#cancelButton").bind("click",function(){ 
+			WINDOW.close(p.WINID);//关闭窗口
+		});		
+		//表单例子------------------------------------------		
+		//表单格式化处理
+		SubmitForm=new  formDeal(p.find("#Detail"));// detailDeal(p.find("#Detail"));
+		if(p.CONDITION["id"]){
+			$(SubmitForm).one("HTML_FORMATED",getFormData);//绑定格式化完成事件，执行下一步
+		}
+		SubmitForm.parse();	
+		p.find("#saveButton").bind("click",SaveForm);		
+		//更新一下尺寸
+		p.resize();	
+	}	
+	
+	//获取数据
+	function getFormData(){
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){			
+			SubmitForm.bindData(backJson["value"]);//绑定数据								
+		})
+		Loader.POSTDATA("php/mrzb/getZzZcy.php",{"event":"GET_BANZHU","content":{"condition":p.CONDITION},"extend":{}});				
+	}
+	
+	//提交保存
+	function SaveForm(){ 
+		if($(this).hasClass("disabled")){
+			return;	
+		}		
+		if(SubmitForm.check()){ //数据校验
+			//保存失败
+			var errorBack=function(e){				
+				p.find("#saveButton").removeClass("disabled");//解按钮
+			}	
+			//保存成功
+			var saveResult=function(e,BackJson){
+				$.message("保存成功！",2000);
+                                WINDOW.run(p.CONDITION["parentId"],'refresh');
+				p.close();//关闭窗口
+			}
+			//获取表单数据
+			formData=SubmitForm.getData();
+			p.find("#saveButton").addClass("disabled");//锁按钮			
+			var postData={"event":"SAVE_BANZHU",
+									"extend":{"eventswitch":"save"},
+									"content":{"condition":p.CONDITION,"value":formData}
+									};		
+			var Loader=new AJAXObj();
+			$(Loader).unbind().one("JSON_LOADED",saveResult).one("SYS_ERROR",errorBack);			
+			Loader.POSTDATA("php/mrzb/AddOrUpdateZbz.php",postData);
+		}
+	}	
+}
+</script>
+<!--内容部分start-->
+<!--表单-->
+<div class="detailBox">
+  <form id="Detail">
+    <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+      <tr>
+        <th width="140" align="right"><i>班组名称</i></th>
+        <td><input style="width:300px"    name="zbzdh" type="text" class="must" /></td>
+      </tr>
+      <tr>
+        <th align="right"><i>班组值班长</i></th>
+        <td><input  type="text" name="zz"  style="width:300px" class="fm_popOutSelect must" data-option="{'url':'pages/mrzb/rwGroupSelector.html','width':600,'height':400,'mulit':false}" /></td>
+      </tr>
+      <tr>
+        <th align="right"><i>班组成员</i></th>
+        <td><input  type="text" name="zcyzh"  style="width:300px" class="fm_popOutSelect must" data-option="{'url':'pages/mrzb/rwGroupSelector.html','width':600,'height':400,'mulit':true}" /></td>
+      </tr>
+    </table>
+  </form>
+</div>
+<!--提交按钮-->
+<div class="submitButs"><a  id="saveButton" class="but-normal but-red"><i class="fa fa-save"></i> 保存</a> <a  id="cancelButton" class="but-normal but-yellow"> <i class="fa fa-reply"></i> 取消</a></div>
+<!--内容部分end--> 

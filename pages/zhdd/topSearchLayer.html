@@ -1,0 +1,442 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	var clumoption = [];
+	var result=[];
+	var record = [];
+	var mapObj = null;
+	var type = null;
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		p.find(".datalist").height(p.WRAPER.height());
+		p.find("#tt").datagrid("resize"); 
+	}
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+		//var layer = circleFeature.layer;
+		
+		//layer.removeFeatures([circleFeature]);
+		//mapObj.zoomOut();
+		//mapObj.zoomIn();
+	}
+	
+	this.READY=function(){ 
+		result = p.CONDITION["result"];
+		type = p.CONDITION["type"];
+		mapObj = mainWindow.mapObj; 
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+		
+		//表格例子------------------------------------------
+		clumoption=[[
+			{field:'mc',title:'名称',resizable:false,align:"left",width:460}
+			]];
+		p.find("#tt").datagrid({
+			fit:true,
+			showFooter:true,//显示总计
+			rownumbers:true,//行号
+			singleSelect:true,//单选
+			fitColumns:true,//宽度自适应
+			striped:true,//条纹
+			pagination:true,//分页
+			pageSize:20,
+			onClickRow:dataGridClick,
+			columns:clumoption,
+			loadFilter:pagerFilter
+		})
+		
+		//更新一下尺寸，注意执行时间点，一般放在最后
+		p.resize();		
+		p.find("#tt").datagrid('loadData', result)
+	}
+	
+	this.loadGPSMobile = function(){
+		var mobileLayer = mapObj.getLayersByName("移动警务")[0];
+		mobileLayer.setVisibility(true);
+		var record = new Array()
+		var obj = {};
+		var mobileStore = mainWindow.mobileStore;
+		for (var i=0;i<mobileStore.length;i++) {
+			var point = OpenLayers.Geometry.fromWKT(mobileStore[i].location);
+			var lonlat = new OpenLayers.LonLat(point.x, point.y); 
+			var radius = OpenLayers.Util.distVincenty(radiusMarker,lonlat)*1000; //换成米
+			if(radius<miter){
+				mobileStore[i]['bz']=mobileStore[i].userName;
+				mobileStore[i]['feature']=mobileStore[i].ft;
+				record.push(mobileStore[i]);
+			}
+		}
+		
+		p.find("#tt").datagrid('loadData', [{"bz":"1"}]);
+		p.find("#tt").datagrid('loadData', record);
+		//p.find("#tt").datagrid("loadData",record);
+	}
+	
+	this.loadGPSGroup = function(){
+		var groupLayer = mapObj.getLayersByName("巡逻组")[0];
+		groupLayer.setVisibility(true);
+		var record = new Array()
+		var obj = {};
+		var stationGroupStore = mainWindow.stationGroupStore;
+		for (var i=0;i<stationGroupStore.length;i++) {
+			var point = OpenLayers.Geometry.fromWKT(stationGroupStore[i].location);
+			var lonlat = new OpenLayers.LonLat(point.x, point.y); 
+			var radius = OpenLayers.Util.distVincenty(radiusMarker,lonlat)*1000; //换成米
+			if(radius<miter){
+				stationGroupStore[i]['bz']=stationGroupStore[i].hphm;
+				stationGroupStore[i]['feature']=stationGroupStore[i].marker;
+				record.push(stationGroupStore[i]);
+			}
+		}
+		
+		p.find("#tt").datagrid('loadData', [{"bz":"1"}]);
+		p.find("#tt").datagrid('loadData', record);
+		//p.find("#tt").datagrid("loadData",record);
+	}
+	
+	this.loadGPS350 = function(){
+		var m350Layer = mapObj.getLayersByName("350M")[0];
+		m350Layer.setVisibility(true);
+		var record = new Array()
+		var obj = {};
+		var m350Store = mainWindow.m350Store;
+		for (var i=0;i<m350Store.length;i++) {
+			var point = OpenLayers.Geometry.fromWKT(m350Store[i].location);
+			var lonlat = new OpenLayers.LonLat(point.x, point.y); 
+			var radius = OpenLayers.Util.distVincenty(radiusMarker,lonlat)*1000; //换成米
+			if(radius<miter){
+				m350Store[i]['bz']=m350Store[i].id;
+				m350Store[i]['feature']=m350Store[i].ft;
+				record.push(m350Store[i]);
+			}
+		}
+		
+		p.find("#tt").datagrid('loadData', [{"bz":"1"}]);
+		p.find("#tt").datagrid('loadData', record);
+		//p.find("#tt").datagrid("loadData",record);
+	}
+	
+	this.loadFire = function(){
+		var fireLayer = mapObj.getLayersByName("消防车")[0];
+		fireLayer.setVisibility(true);
+		var record = new Array()
+		var obj = {};
+		var fireStore = mainWindow.fireStore;
+		for (var i=0;i<fireStore.length;i++) {
+			var point = OpenLayers.Geometry.fromWKT(fireStore[i].location);
+			if(point){
+				var lonlat = new OpenLayers.LonLat(point.x, point.y); 
+				var radius = OpenLayers.Util.distVincenty(radiusMarker,lonlat)*1000; //换成米
+				if(radius<miter){
+					fireStore[i]['bz']=fireStore[i].id;
+					fireStore[i]['feature']=fireStore[i].ft;
+					record.push(fireStore[i]);
+				}
+			}
+		}
+		
+		p.find("#tt").datagrid('loadData', [{"bz":"1"}]);
+		p.find("#tt").datagrid('loadData', record);
+	}	
+	
+	this.loadNaturalWater = function(){
+		var naturalWaterLayer = mapObj.getLayersByName("天然水源")[0];
+		naturalWaterLayer.setVisibility(true);
+		var record = new Array()
+		var obj = {};
+		var naturalWaterFeatures = mainWindow.naturalWaterFeatures;
+		for (var i=0;i<naturalWaterFeatures.length;i++) {
+			var lonlat = new OpenLayers.LonLat(naturalWaterFeatures[i].geometry.x,naturalWaterFeatures[i].geometry.y);
+			var radius = OpenLayers.Util.distVincenty(radiusMarker,lonlat)*1000; //换成米
+			if(radius<miter){
+				var info = naturalWaterFeatures[i]['info'];
+				info['feature']=naturalWaterFeatures[i];
+				naturalWaterFeatures[i]['info']['bz']=naturalWaterFeatures[i]['info']['location'];
+				record.push(naturalWaterFeatures[i]['info']);
+			}
+		}
+		
+		p.find("#tt").datagrid('loadData', [{"bz":"1"}]);
+		p.find("#tt").datagrid('loadData', record);
+		//p.find("#tt").datagrid("loadData",record);
+	}
+	
+	this.loadPool = function(){
+		var poolLayer = mapObj.getLayersByName("消防水池")[0];
+		poolLayer.setVisibility(true);
+		var record = new Array()
+		var obj = {};
+		var poolFeatures = mainWindow.poolFeatures;
+		for (var i=0;i<poolFeatures.length;i++) {
+			var lonlat = new OpenLayers.LonLat(poolFeatures[i].geometry.x,poolFeatures[i].geometry.y);
+			var radius = OpenLayers.Util.distVincenty(radiusMarker,lonlat)*1000; //换成米
+			if(radius<miter){
+				var info = poolFeatures[i]['info'];
+				info['feature']=poolFeatures[i];
+				poolFeatures[i]['info']['bz']=poolFeatures[i]['info']['address'];
+				record.push(poolFeatures[i]['info']);
+			}
+		}
+		
+		p.find("#tt").datagrid('loadData', [{"bz":"1"}]);
+		p.find("#tt").datagrid('loadData', record);
+		//p.find("#tt").datagrid("loadData",record);
+	}
+	
+	this.loadCrane = function(){
+		var craneLayer = mapObj.getLayersByName("消防水鹤")[0];
+		craneLayer.setVisibility(true);
+		var record = new Array()
+		var obj = {};
+		var craneFeatures = mainWindow.craneFeatures;
+		for (var i=0;i<craneFeatures.length;i++) {
+			var lonlat = new OpenLayers.LonLat(craneFeatures[i].geometry.x,craneFeatures[i].geometry.y);
+			var radius = OpenLayers.Util.distVincenty(radiusMarker,lonlat)*1000; //换成米
+			if(radius<miter){
+				var info = craneFeatures[i]['info'];
+				info['feature']=craneFeatures[i];
+				craneFeatures[i]['info']['bz']=craneFeatures[i]['info']['address'];
+				record.push(craneFeatures[i]['info']);
+			}
+		}
+		
+		p.find("#tt").datagrid('loadData', [{"bz":"1"}]);
+		p.find("#tt").datagrid('loadData', record);
+		//p.find("#tt").datagrid("loadData",record);
+	}
+	
+	this.loadPier = function(){
+		var pierLayer = mapObj.getLayersByName("消防码头")[0];
+		pierLayer.setVisibility(true);
+		var record = new Array()
+		var obj = {};
+		var pierFeatures = mainWindow.pierFeatures;
+		for (var i=0;i<pierFeatures.length;i++) {
+			var lonlat = new OpenLayers.LonLat(pierFeatures[i].geometry.x,pierFeatures[i].geometry.y);
+			var radius = OpenLayers.Util.distVincenty(radiusMarker,lonlat)*1000; //换成米
+			if(radius<miter){
+				var info = pierFeatures[i]['info'];
+				info['feature']=pierFeatures[i];
+				pierFeatures[i]['info']['bz']=pierFeatures[i]['info']['address'];
+				record.push(pierFeatures[i]['info']);
+			}
+		}
+		
+		p.find("#tt").datagrid('loadData', [{"bz":"1"}]);
+		p.find("#tt").datagrid('loadData', record);
+		//p.find("#tt").datagrid("loadData",record);
+	}
+	
+	this.loadHydrant = function(){
+		var hydrantLayer = mapObj.getLayersByName("消火栓")[0];
+		hydrantLayer.setVisibility(true);
+		var record = new Array()
+		var obj = {};
+		var hydrantFeatures = mainWindow.hydrantFeatures;
+		for (var i=0;i<hydrantFeatures.length;i++) {
+			var lonlat = new OpenLayers.LonLat(hydrantFeatures[i].geometry.x,hydrantFeatures[i].geometry.y);
+			var radius = OpenLayers.Util.distVincenty(radiusMarker,lonlat)*1000; //换成米
+			if(radius<miter){
+				var info = hydrantFeatures[i]['info'];
+				info['feature']=hydrantFeatures[i];
+				hydrantFeatures[i]['info']['bz']=hydrantFeatures[i]['info']['address']!=""?hydrantFeatures[i]['info']['address']:hydrantFeatures[i]['info']['name'];
+				record.push(hydrantFeatures[i]['info']);
+			}
+		}
+		
+		p.find("#tt").datagrid('loadData', [{"bz":"1"}]);
+		p.find("#tt").datagrid('loadData', record);
+		//p.find("#tt").datagrid("loadData",record);
+	}
+	
+	this.loadOrg = function(){
+		var orgLayer = mapObj.getLayersByName("机构点位")[0];
+		orgLayer.setVisibility(true);
+		var record = new Array()
+		var obj = {};
+		var orgFeatures = mainWindow.orgFeatures;
+		for (var i=0;i<orgFeatures.length;i++) {
+			var lonlat = new OpenLayers.LonLat(orgFeatures[i].geometry.x,orgFeatures[i].geometry.y);
+			var radius = OpenLayers.Util.distVincenty(radiusMarker,lonlat)*1000; //换成米
+			if(radius<miter){
+				var info = orgFeatures[i]['info'];
+				info['feature']=orgFeatures[i];
+				orgFeatures[i]['info']['bz']=orgFeatures[i]['info']['address'];
+				record.push(orgFeatures[i]['info']);
+			}
+		}
+		
+		p.find("#tt").datagrid('loadData', [{"bz":"1"}]);
+		p.find("#tt").datagrid('loadData', record);
+		//p.find("#tt").datagrid("loadData",record);
+	}
+	
+	this.loadKk = function(){
+		var kkLayer = mapObj.getLayersByName("卡口")[0];
+		kkLayer.setVisibility(true);
+		var record = new Array()
+		var obj = {};
+		var kkFeatures = mainWindow.kkFeatures;
+		for (var i=0;i<kkFeatures.length;i++) {
+			var lonlat = new OpenLayers.LonLat(kkFeatures[i].geometry.x,kkFeatures[i].geometry.y);
+			var radius = OpenLayers.Util.distVincenty(radiusMarker,lonlat)*1000; //换成米
+			if(radius<miter){
+				var info = kkFeatures[i]['info'];
+				info['feature']=kkFeatures[i];
+				kkFeatures[i]['info']['bz']=kkFeatures[i]['info']['kkmc'];
+				record.push(kkFeatures[i]['info']);
+			}
+		}
+		
+		p.find("#tt").datagrid('loadData', [{"bz":"1"}]);
+		p.find("#tt").datagrid('loadData', record);
+		//p.find("#tt").datagrid("loadData",record);
+	}
+	
+	this.loadDzwl = function(){
+		var dzwlLayer = mapObj.getLayersByName("电子围栏")[0];
+		dzwlLayer.setVisibility(true);
+		var record = new Array()
+		var obj = {};
+		var dzwlFeatures = mainWindow.dzwlFeatures;
+		for (var i=0;i<dzwlFeatures.length;i++) {
+			var lonlat = new OpenLayers.LonLat(dzwlFeatures[i].geometry.x,dzwlFeatures[i].geometry.y);
+			var radius = OpenLayers.Util.distVincenty(radiusMarker,lonlat)*1000; //换成米
+			if(radius<miter){
+				var info = dzwlFeatures[i]['info'];
+				info['feature']=dzwlFeatures[i];
+				dzwlFeatures[i]['info']['bz']=dzwlFeatures[i]['info']['wzmc'];
+				record.push(dzwlFeatures[i]['info']);
+			}
+		}
+		
+		p.find("#tt").datagrid('loadData', [{"bz":"1"}]);
+		p.find("#tt").datagrid('loadData', record);
+		//p.find("#tt").datagrid("loadData",record);
+	}
+	
+	this.loadCameraData = function(features,circle_feature){
+		circleFeature = circle_feature;
+		record = new Array();
+		for (var i=0;i<features.length;i++) {
+			var info = features[i]['info'];
+			info['feature']=features[i];
+			features[i]['info']['bz']=features[i]['info']['azbw'];
+			record.push(features[i]['info']);
+		}
+		
+		p.find("#tt").datagrid('loadData', [{"bz":"1"}]);
+		p.find("#tt").datagrid('loadData', record);
+		//p.find("#tt").datagrid("loadData",record);
+	}
+	
+	function pagerFilter(data){
+			if (typeof data.length == 'number' && typeof data.splice == 'function'){	// is array
+				data = {
+					total: data.length,
+					rows: data
+				}
+			}
+			var dg = $(this);
+			var opts = dg.datagrid('options');
+			var pager = dg.datagrid('getPager');
+			pager.pagination({
+				onSelectPage:function(pageNum, pageSize){
+					opts.pageNumber = pageNum;
+					opts.pageSize = pageSize;
+					pager.pagination('refresh',{
+						pageNumber:pageNum,
+						pageSize:pageSize
+					});
+					dg.datagrid('loadData',data);
+				}
+			});
+			if (!data.originalRows){
+				data.originalRows = (data.rows);
+			}
+			var start = (opts.pageNumber-1)*parseInt(opts.pageSize);
+			var end = start + parseInt(opts.pageSize);
+			data.rows = (data.originalRows.slice(start, end));
+			return data;
+	}
+	
+	//datagrid行点击
+	function dataGridClick(rowIndex,rowData){ 
+		var controls = mapObj.controls;
+		var selectFeature = null;
+		for(var i=0;i<controls.length;i++){
+			if(controls[i].CLASS_NAME=="OpenLayers.Control.SelectFeature"){
+				selectFeature = controls[i];
+				break;
+			}
+		}
+		var feature = null;
+		if(type=="modelLayer"){
+			var layer = mapObj.getLayersByName("移动警务")[0];
+			layer.setVisibility(true);
+			var mobileStore = mainWindow.mobileStore;
+			for (var i=0;i<mobileStore.length;i++) {
+				//alert(JSON.stringify(mobileStore[i]));
+				if(mobileStore[i].id==rowData.id){
+					feature=mobileStore[i].ft;
+					mapObj.zoomToExtent(feature.geometry.getBounds(),true);  
+					break;
+				}
+			}
+		}else if(type=="m350Layer"){
+			var layer = mapObj.getLayersByName("350M")[0];
+			layer.setVisibility(true);
+			var m350Store = mainWindow.m350Store;
+			for (var i=0;i<m350Store.length;i++) {
+				if(m350Store[i].id==rowData.id){
+					feature = m350Store[i].ft;
+					mapObj.zoomToExtent(feature.geometry.getBounds(),true);  
+					break;
+				}
+			}
+		}else if(type=="groupLayer"){
+			var layer = mapObj.getLayersByName("巡逻组")[0];
+			layer.setVisibility(true);
+			var stationGroupStore = mainWindow.stationGroupStore;
+			for (var i=0;i<stationGroupStore.length;i++) {
+				if(stationGroupStore[i].gid==rowData.id){
+					feature=stationGroupStore[i].marker;
+					mapObj.setCenter(feature.geometry.getBounds);
+					mapObj.zoomToExtent(feature.geometry.getBounds(),true);  
+					break;
+				}
+			}
+		}else if(type=="nbdwLayer"){
+			var layer = mapObj.getLayersByName("内保单位")[0];
+			layer.setVisibility(true);
+			var nbdwFeatures = mainWindow.nbdwFeatures;
+			for (var i=0;i<nbdwFeatures.length;i++) {
+				var info = nbdwFeatures[i]['info'];
+				if(info.id==rowData.id){
+					feature = nbdwFeatures[i];
+					mapObj.zoomToExtent(feature.geometry.getBounds(),true);  
+					break;
+				}
+			}
+		}
+		if(selectFeature&&feature){
+			selectFeature.unselectAll();
+			selectFeature.select(feature);
+		}
+		
+	}
+}
+</script>
+<!--内容部分start-->
+<!--表格-->
+<div class="datalist" id="tabcont">
+  <div id="tt"> </div>
+</div>
+<!--内容部分end--> 
+

@@ -1,0 +1,124 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	var TABBox;
+	var LISTPT;
+	var LISTXL;
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		if(TABBox){
+			TABBox.resize();
+		}
+	}
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){  
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+
+		//点位--------------------------------------------------------------------	
+		LISTPT=new ListView(p.find("#pointdatarow"));
+		//获取数据
+		LISTPT.load("host/listview.asp",{"event":"listTemp","content":{"condition":p.CONDITION},"extend":{}});
+		
+		//巡逻组--------------------------------------------------------------------------
+		//格式化独立事件绑定------------------------------------
+		var ActionFormater=function(RowObj){
+			RowObj.find("a#showDetail").bind("click",function(){
+				var groupid=RowObj.data("data")["groupid"];
+				//触发滑动到下一页事件
+				$(p.WINDOW).trigger("GOTO_PAGE",{"condition":{"gid":groupid,"type":"巡逻组"},"winid":p.WINID});
+				return false;
+			})
+		}
+		
+		LISTXL=new ListView(p.find("#groupdatarow")); //列表容器，分页容器
+		//获取数据
+		LISTXL.load("host/listview.asp",{"event":"listTemp","content":{"condition":p.CONDITION},"extend":{}},null,ActionFormater); 	
+		
+		//安装TAB组件	(tab标签容器,对应标签的内容容器)
+		TABBox=new Tabs(p.find(".fm_tabBox"),p.find("#tabcont"));
+		$(TABBox).bind("TAB_CLICK",function(e,Vars){ //绑定tab标签点击事件	
+			var option=Vars["tabItem"].getDataOptions();//获得按钮参数
+			var tagindex=option["type"];
+			p.find(".tabblock").hide().eq(tagindex).show();
+		}).bind("TAB_RESIZE",function(e,size){ //绑定tab布局resize事件
+			p.find(".datalist").height(size.h);	
+		})
+		
+		//更新一下尺寸，注意执行时间点，一般放在最后
+		p.resize();		
+	}
+	
+}
+</script>
+<!--内容部分start-->
+<!--tab标签-->
+<div class="fm_tabBox" style="padding-top:8px"  data-option="{'position':'top','width':200,'default':0}"> <a data-option="{'type':'0'}">任务点位列表</a><a data-option="{'type':'1'}">巡逻组列表</a> </div>
+
+<!--表格-->
+<div class="datalist" id="tabcont"> 
+  <!--点位信息-->
+  <div id="pointdatarow" class="tabblock">
+    <div class="contBlock">
+      <table width="100%" border="0" cellspacing="0" cellpadding="0">
+        <tr>
+          <th width="100" align="right">点位名称</th>
+          <td width="300"  id="groupname">&nbsp;</td>
+          <th align="right">位置坐标</th>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <th width="100" align="right">巡逻时段</th>
+          <td>&nbsp;</td>
+          <th align="right">最小间隔时间</th>
+          <td id="groupid">&nbsp;</td>
+        </tr>
+        <tr>
+          <th align="right">巡逻频次</th>
+          <td>&nbsp;</td>
+          <th width="120" align="right">状态</th>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <th align="right">备注</th>
+          <td colspan="3">&nbsp;</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+  <!--巡逻组信息-->
+  <div id="groupdatarow" class="tabblock">
+    <div class="contBlock">
+      <table width="100%" border="0" cellspacing="0" cellpadding="0">
+        <tr>
+          <th width="100" align="right">巡逻组名称</th>
+          <td id="groupname">&nbsp;</td>
+        </tr>
+        <tr>
+          <th align="right">所属派出所</th>
+          <td id="groupid">&nbsp;</td>
+        </tr>
+        <tr>
+          <th align="right">备注</th>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <th align="right">&nbsp;</th>
+          <td id="actionbut"><a class="but-small but-green" id="showDetail">查看考勤记录</a></td>
+        </tr>
+      </table>
+    </div>
+  </div>
+</div>
+</div>
+<!--内容部分end--> 
+

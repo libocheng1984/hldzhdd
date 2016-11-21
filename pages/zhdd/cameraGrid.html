@@ -1,0 +1,149 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行READY方法，代替document.ready执行
+//重要：写在ACTION外的方法是全局方法，尽量不要这么干，以免方法冲突。
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//重要：页面关闭的时候会尝试执行DESTROY方法，请在这里解除事件绑定，销毁对象，以免窗体残留。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+//重要：保证标签完整闭合，否则IE8报错 “ACTION_Window_1426578029038953”未定义
+function ACTION(){
+	var p=this;
+	var features=[];
+	var record = [];
+	var mapObj = null;
+	var circleFeature = null;
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){ 
+		p.find(".datalist").height(p.WRAPER.height()); 
+		p.find("#tt").datagrid("resize"); 
+	}
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+		for (var i=0;i<features.length;i++) {
+			features[i].style.externalGraphic="images/zhdd/camera.png";
+		}
+		var layer = circleFeature.layer;
+		
+		layer.removeFeatures([circleFeature]);
+		mapObj.zoomOut();
+		mapObj.zoomIn();
+	}
+	
+	this.READY=function(){
+		features = p.CONDITION["features"];
+		circleFeature = p.CONDITION["circleFeature"];
+		mapObj = mainWindow.mapObj;
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+		
+		//表格例子------------------------------------------EasyUI组件
+		var clumoption=[[
+			//{field:'code',title:'编号',width:40,fixed:true,align:"center",checkbox:true},
+			{field:'azbw',title:'安装部位',width:"99%",resizable:false,align:"left"}
+			]];
+		p.find("#tt").datagrid({
+			fit:true,
+			showFooter:true,//显示总计
+			rownumbers:true,//行号
+			singleSelect:true,//单选
+			fitColumns:true,//宽度自适应
+			striped:true,//条纹
+			pagination:true,//分页
+			pageSize:20,
+			onClickRow:dataGridClick,
+			columns:clumoption,
+			loadFilter:pagerFilter
+		})
+		
+		//更新一下尺寸
+		p.resize();
+		
+		p.loadCameraData(features,circleFeature);
+		
+	}
+	
+	this.loadCameraData = function(features,circle_feature){
+		circleFeature = circle_feature;
+		record = new Array();
+		for (var i=0;i<features.length;i++) {
+			var info = features[i]['info'];
+			info['feature']=features[i];
+			record.push(features[i]['info']);
+		}
+		p.find("#tt").datagrid('loadData', record);
+		//p.find("#tt").datagrid("loadData",record);
+	}
+	
+	function pagerFilter(data){
+			if (typeof data.length == 'number' && typeof data.splice == 'function'){	// is array
+				data = {
+					total: data.length,
+					rows: data
+				}
+			}
+			var dg = $(this);
+			var opts = dg.datagrid('options');
+			var pager = dg.datagrid('getPager');
+			pager.pagination({
+				onSelectPage:function(pageNum, pageSize){
+					opts.pageNumber = pageNum;
+					opts.pageSize = pageSize;
+					pager.pagination('refresh',{
+						pageNumber:pageNum,
+						pageSize:pageSize
+					});
+					dg.datagrid('loadData',data);
+				}
+			});
+			if (!data.originalRows){
+				data.originalRows = (data.rows);
+			}
+			var start = (opts.pageNumber-1)*parseInt(opts.pageSize);
+			var end = start + parseInt(opts.pageSize);
+			data.rows = (data.originalRows.slice(start, end));
+			return data;
+	}
+	
+	//datagrid行点击
+	function dataGridClick(rowIndex,rowData){ 
+		var controls = mapObj.controls;
+		var selectFeature = null;
+		for(var i=0;i<controls.length;i++){
+			if(controls[i].CLASS_NAME=="OpenLayers.Control.SelectFeature"){
+				selectFeature = controls[i];
+				break;
+			}
+		}
+		if(selectFeature){
+			selectFeature.unselectAll();
+			selectFeature.select(rowData.feature);
+		}
+		/*
+		 var feature = rowData.feature;
+		 var feature = features[0];
+         var popup = new OpenLayers.Popup.FramedCloud("popup",
+               OpenLayers.LonLat.fromString(feature.geometry.toShortString()),
+               null,
+               //互联网代码
+               //"<div style='font-size:.9em'>摄像头:<br>编号: " + feature.info.sxtbh + "<br>安装部位: " + feature.info.azbw+"&nbsp</div>",
+               //公安网代码
+               //"<div style='font-size:.9em'>摄像头:<br>编号: " + feature.info.sxtbh + "<br>安装部位: " + feature.info.azbw+"<br><a href='http://10.80.128.83/modules/thirdParty/playwin.jsp?cameraIndexCode="+feature.info.xtidbm+"' target='_blank'>点击察看实时监控</a><br/><iframe width='360' height='320' src='http://10.80.128.83/modules/thirdParty/playwin.jsp?cameraIndexCode="+feature.info.xtidbm+"'></iframe></div>",
+	   "<div style='font-size:.9em'>摄像头<br>——————————————————<br>编号: " + rowData.sxtbh + "<br>安装部位: " + rowData.azbw+"<br>——————————————————<br><a href='http://10.80.128.83/modules/thirdParty/playwin.jsp?cameraIndexCode="+rowData.xtidbm+"' target='_blank'>实时监控</a></div>",
+               null,
+               false
+           );
+         feature.popup = popup;
+         mapObj.addPopup(popup);
+         */
+	}
+
+}
+</script>
+
+<!--内容部分start-->
+<div class="datalist">
+  <div id="tt"> </div>
+</div>
+<!--内容部分end--> 

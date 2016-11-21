@@ -1,0 +1,31 @@
+<script type="text/javascript">
+function ACTION(){
+	var p=this;
+	
+	this.READY=function(){		
+		p.find("p").html("我的ID："+p.WINID+",<br/>父级窗口ID："+p.CONDITION["parentid"]+",<br/>传来参数："+p.CONDITION["guid"]);	
+		if(p.CONDITION["parentid"]){
+			var parentWindow=WINDOW.getActionById(p.CONDITION["parentid"]);//通过窗体ID找到窗体对象（ACTION）
+			parentWindow.getMsgFromChild("子窗口捎来一句话，他的ID："+p.WINID); //执行父窗体方法
+			parentWindow.find(".searchBox td:eq(0)").text("我把你改了~~~"); //操作父窗体元素
+		}
+		
+	this.DESTROY=function(){ 
+		$.alert("你删除我了~~~~！");
+	}
+		
+		//var parentWraper=PAGER.getWindowWraperById(p.CONDITION["parentid"]);
+		//parentWraper.find
+	}	
+}
+</script>
+<style type="text/css">
+.aa {
+	cursor: en-resize;
+}
+</style>
+
+<div >
+这是新窗口
+<p></p>
+</div>

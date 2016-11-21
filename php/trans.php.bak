@@ -1,0 +1,28 @@
+<?php 
+	header('Content-Type: text/html; charset=UTF-8');
+	
+	
+	/*查询*/
+	/*传入参数*/
+	$event = isset ($_REQUEST['event']) ? $_REQUEST['event'] : "";
+	$content = isset ($_REQUEST['content']) ? $_REQUEST['content'] : "";
+	$extend = isset ($_REQUEST['extend']) ? $_REQUEST['extend'] : "";
+	$content = Json_decode($content,true);
+	
+	if(isset($content['condition'])){
+		$url = isset($content['condition']['url'])?$content['condition']['url']:"";
+	}
+	//$url = isset( $_REQUEST['url'] ) ? $_REQUEST['url'] : "";
+	$fh= file_get_contents($url);
+	//$fh = '{ "code":"1", "msg":"OK", "exp":null, "data":[ { "id":"24432", "zbx":"121.956959", "zby":"39.399446", "name":"人民广场", "_version_":"1506735361123942400" }, { "id":"24460", "zbx":"121.611676", "zby":"38.910420", "name":"人民广场", "_version_":"1506735361274937344" }, { "id":"23507", "zbx":"121.603768", "zby":"38.915417", "name":"人民广场税务所", "_version_":"1506735355636744192" }, { "id":"25032", "zbx":"121.610389", "zby":"38.902195", "name":"人民广场街道", "_version_":"1506735364662886400" }, { "id":"24388", "zbx":"121.611137", "zby":"38.908655", "name":"人民广场派出所", "_version_":"1506735360860749824" }, { "id":"25774", "zbx":"121.613661", "zby":"38.907259", "name":"人民广场工商所", "_version_":"1506735375765209088" }, { "id":"25750", "zbx":"121.607698", "zby":"38.912921", "name":"民生银行人民广场支行", "_version_":"1506735375370944512" }, { "id":"24183", "zbx":"121.611517", "zby":"38.908016", "name":"人民广场公安派出所", "_version_":"1506735359604555776" }, { "id":"25065", "zbx":"121.623879", "zby":"38.891157", "name":"人民广场桥东社区", "_version_":"1506735364841144320" }, { "id":"25751", "zbx":"121.611562", "zby":"38.909691", "name":"招行人民广场支行", "_version_":"1506735375386673152" } ], "datalen":10, "total":500 }';
+	//$fh='{ "code":"1", "msg":"OK", "exp":null, "data":[ { "zbx":"121.612356", "zby":"38.914809", "zbdz":"黄河路" }, { "zbx":"121.612356", "zby":"38.914809", "zbdz":"新开路" }, { "zbx":"121.603199", "zby":"38.912295", "zbdz":"大同街" }, { "zbx":"121.603199", "zby":"38.912295", "zbdz":"黄河路" } ], "datalen":4, "total":4 }';
+	$result = array (
+				'head' => array (
+							'code' => 1,
+							'message' => ''
+							),
+				'value' => $fh,
+				'extend' => ''
+			);
+	echo json_encode($result, JSON_UNESCAPED_UNICODE);
+?>

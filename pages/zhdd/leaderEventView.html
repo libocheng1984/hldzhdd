@@ -1,0 +1,1740 @@
+<script type="text/javascript"><!--
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	var record = null;
+	var fkuiObj;
+	var bjxxobj;
+	var fjxxobj;
+	var eventStore = new Array();
+	var groupStore = new Array();
+	var lastGroupStore = new Array();
+	var ljfxFeatures = new Array();
+	var mapUtil = new MapUtil();
+	
+	var mobileRoundTemp = new Array();
+	var jwgzzRoundTemp = new Array();
+	var kkRoundTemp = new Array();
+	var ljfxLayer = "";
+	var cameralayer = "";
+	var mobileLayer = "";
+	var jwgzzLayer = "";
+	var kkLayer = "";
+	var pageoption={
+		"wraper":[
+				{"width":450,"class":"layout_fixdWraper","id":"fixdWraper","drag":true},
+				{"width":1,"class":"layout_contentWraper","id":"contentWraper"}
+			],
+			"pannal":[
+				{"width":400,"closew":10,"dir":"right","zindex":3,"class":"layout_slideWraper","id":"slideWraper"}
+			],		
+			"openslide":"mouseenter","closeslide":"click",
+			"minContWidth":200
+		};
+	var MulitContainer;
+	var DataGrid;
+	var MapContainer;
+	var TABBox;
+	
+	//表单对象
+	var Detailobj;
+	var detailAccBox;
+	var chuJingDan;
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		var H=p.WRAPER.height()-p.find(".titleWraper").outerHeight(true); 
+		p.find("#layout").setRealSize(null,H);		
+		MulitContainer.resize();
+		MapContainer.find("#smallMapForJingQing").fillParent();
+		if(TABBox){
+			TABBox.resize();
+		}		
+		if(DataGrid){
+			DataGrid.datagrid("resize");
+		}	
+	}	
+	
+	this.DESTROY=function(){ 
+		if(TABBox){
+			TABBox=null
+		}		
+		if(DataGrid){
+			DataGrid=null;
+		}
+		if(MulitContainer){
+			MulitContainer.destroy();
+			MulitContainer=null;	
+		}
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+		$(document).unbind("addEventDetailData",eventJqtz);
+		$(document).unbind("addPoliceGroupData",loadDynamicGroup);
+	}
+	
+	this.READY=function(){
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);		
+		MulitContainer=new fixFreeLayout(p.find("#layout"),pageoption);		
+		MapContainer=MulitContainer.getContainerById("contentWraper");
+		
+		//插入地图容器
+		MapContainer.append($('<div id="smallMapForJingQing"></div>'));				
+		//安装表格
+		var dataGridContainer=MulitContainer.getContainerById("slideWraper");		
+		dataGridContainer.append(p.find(".fm_tabBox")).append(p.find("#tabcont"));
+		DataGrid=dataGridContainer.find("#datalist");
+		
+		//安装TAB组件	(tab标签容器,对应标签的内容容器)
+		TABBox=new Tabs(p.find(".fm_tabBox"),p.find("#tabcont"));
+		$(TABBox).bind("TAB_CLICK",function(e,Vars){ //绑定tab标签点击事件	
+			var option=Vars["tabItem"].getDataOptions();//获得按钮参数
+			var option=Vars["tabItem"].getDataOptions();//获得按钮参数
+			switch(option.type){
+				case "1":
+					loadGPSMobile();
+					break;
+				case "2":
+					loadJwgzzData();
+					break;
+				case "3":
+					loadKkData();
+					break;
+			}
+			DataGrid.datagrid("reload",option);//更新表格
+		}).bind("TAB_RESIZE",function(e,size){ //绑定tab布局resize事件
+			p.find(".datalist").height(size.h);	
+			DataGrid.datagrid("resize"); 
+		})
+		$(MulitContainer).bind("SLIDE_RESIZE",TABBox.resize);//滑开重置FOR IE9
+		
+		//表格例子------------------------------------------
+		var clumoption=[[
+			{field:'dynamic_bz',title:'备注',resizable:false,align:"center"}
+			]];
+		DataGrid.datagrid({
+			fit:true,
+			showFooter:true,//显示总计
+			rownumbers:true,//行号
+			singleSelect:true,//单选
+			fitColumns:true,//宽度自适应
+			striped:true,//条纹
+			pagination:false,//分页
+			onClickRow:dataGridClick,
+			columns:clumoption
+		})
+		
+		//安装左侧
+		LeftContainer=MulitContainer.getContainerById("fixdWraper");
+		LeftContainer.append(p.find(".detailBox"));
+		//表单格式化处理
+		//表单例子------------------------------------------		
+		//表单例子------------------------------------------
+		fkuiObj=new formDeal(p.find("#Fankui"));		
+		fkuiObj.parse();
+		bjxxobj=new detailDeal(p.find("#bjxx"));
+		bjxxobj.parse();
+		fjxxobj=new detailDeal(p.find("#fjxx"));
+		fjxxobj.parse();
+		//表单格式化处理
+		Detailobj=new formDeal(p.find("#Detail"));//(".zediewindow"));
+		//Detailobj=new formDeal(p.find(".zediewindow"));//(".zediewindow"));
+		if(!p.CONDITION["newrecord"]){			
+			p.CONDITION["newrecord"]=$.extend({},p.CONDITION["record"]);	
+		}
+		record = p.CONDITION["newrecord"];
+		//debugger;
+		detailAccBox=new AccordionFrame(p.find(".zediewindow"),false);//折叠展开设置,true,false是否只保留一个展开
+		eventJqtz(null,record,"1");
+		Detailobj.parse();			
+		
+		chuJingDan=new ChuJingAction(p.find("#part_3"));
+		//更新一下尺寸
+		p.find("[name=belong]").readonly();
+	    p.find("[name=scene]").readonly();
+		
+		//更新一下尺寸
+		p.resize();		
+		
+		//安装地图
+		mapInit();
+		
+		$(document).unbind("addEventDetailData",eventJqtz);
+		$(document).bind("addEventDetailData",eventJqtz);
+		$(document).unbind("addPoliceGroupData",loadDynamicGroup);
+		$(document).bind("addPoliceGroupData",loadDynamicGroup);
+		//var point= new BMap.Point(121.619205,38.916041); 
+		//var map = new BMap.Map("smallMapForJingQing");
+		//map.centerAndZoom(point, 15);
+	}
+	
+	
+	function mapInit(){
+		//var mapId = p.WINID+Math.floor(Math.random()*10000);
+		//p.find("#eventViewMap").attr("id",mapId)
+		var olMap = new OlMap();
+		mapObj_event = olMap.mapInitialize("smallMapForJingQing","",7);
+		
+		groupLayer = new OpenLayers.Layer.Vector("巡逻组",{rendererOptions: {zIndexing: true}});
+		eventDetailLayer = new OpenLayers.Layer.Vector("警情");
+		eventDetailLayer.style = {
+			graphicWidth:32,   
+			graphicHeight : 32,   
+			graphicXOffset : -16,   
+			graphicYOffset : -16,   
+			externalGraphic : "images/zhdd/jingqing_1.png"
+		}
+		var styles = new OpenLayers.StyleMap({
+					"default": new OpenLayers.Style({
+						strokeColor: "green",
+						strokeWidth: 2
+					})
+				});
+		var cameraStylemap = new OpenLayers.StyleMap({
+			'default': new OpenLayers.Style({
+				pointRadius: 5,
+				fillColor: "#ee0000",
+				fillOpacity: 0.7,
+				strokeColor: "#666666",
+				strokeWidth: 1,
+				strokeOpacity: 1,
+				graphicZIndex: 1
+			}),
+			'select' : new OpenLayers.Style({
+				pointRadius: 5,
+				fillColor: "#ffff00",
+				fillOpacity: 1,
+				strokeColor: "#666666",
+				strokeWidth: 1,
+				strokeOpacity: 1,
+				graphicZIndex: 2
+			})
+		});
+		ljfxLayer = new OpenLayers.Layer.Vector("路径分析",{styleMap: styles,displayInLayerSwitcher:false});
+		cameralayer = new OpenLayers.Layer.Vector('摄像头', {styleMap: cameraStylemap});
+		mobileLayer = new OpenLayers.Layer.Vector("移动警务",{rendererOptions: {zIndexing: true}});
+		jwgzzLayer = new OpenLayers.Layer.Vector('警务工作站');
+		kkLayer = new OpenLayers.Layer.Vector('卡口', {minZoomLevel: 15});
+		/*
+		eventDetailLayerMarker = new OpenLayers.Control.DrawFeature(eventDetailLayer, OpenLayers.Handler.Point);
+		eventDetailLayerMarker.events.on({"featureadded" : function(drawGeometryArgs){
+			
+			if(featureMarker){
+				removeAllFeatures(eventDetailLayer,featureMarker);
+			}
+			featureMarker = drawGeometryArgs.feature;
+			getOrgArea(featureMarker.geometry.x,featureMarker.geometry.y);
+			eventRecord['marker_event'] = featureMarker;
+			var mhjqzb = eventRecord['marker_event'].geometry.toString();
+		}});
+		
+		mapObj_event.addControls([eventDetailLayerMarker]);
+		*/
+		
+		var eventListeners_group = groupListener();
+		groupLayer.events.on(eventListeners_group);
+		var eventListeners_mobile = mobileListener();
+		mobileLayer.events.on(eventListeners_mobile);
+		var eventListeners_event = eventListener();
+		eventDetailLayer.events.on(eventListeners_event);
+		var eventListeners_kk = kkListener();
+		kkLayer.events.on(eventListeners_kk);
+		var eventListeners_jwgzz = jwgzzListener();
+		jwgzzLayer.events.on(eventListeners_jwgzz);
+		var eventListeners_camera = cameraListener();
+		cameralayer.events.on(eventListeners_camera);
+		
+		mapObj_event.addLayers([ljfxLayer,kkLayer,jwgzzLayer,cameralayer,eventDetailLayer,mobileLayer,groupLayer]);
+		selector = new OpenLayers.Control.MySelectFeature([groupLayer,eventDetailLayer,mobileLayer,cameralayer,kkLayer,jwgzzLayer],{
+			autoActivate:true,
+			hover: true,
+			highlightOnly:true
+		});
+		mapObj_event.addControl(selector);
+		mapObj_event.events.on({
+            changelayer: changePoupVisible,
+            scope: this
+        });
+		addEventDataMarker(record,false);
+		getDynamicGroupData();
+		//p.find(".mapicon").bind("click",setMapCenter);
+	}
+	
+	function groupListener(){
+		var eventListeners = {
+	           'featureselected':function(evt){
+	               var feature = evt.feature;
+	               var dhhm = feature.trafficInfo.dhhm?feature.trafficInfo.dhhm:"";
+	               var deviceType = util.getDeviceType(feature.trafficInfo.deviceType);
+	               var popup = new OpenLayers.Popup.FramedCloud("popup",
+	                   OpenLayers.LonLat.fromString(feature.geometry.toShortString()),
+	                   null,
+	                   "<div style='font-size:.9em'>巡逻组<br>——————————————————<br>车牌号："+feature.trafficInfo.hphm+"<br>品牌："+feature.trafficInfo.pp+"<br>定位设备编号："+feature.trafficInfo.deviceId+"<br>定位设备类型："+deviceType+"<br>速度："+feature.trafficInfo.speed+"&nbsp;km/h<br>方向："+feature.trafficInfo.directionZh+"<br>部门："+feature.trafficInfo.orgName+"<br>时间："+feature.trafficInfo.locateTime+"<br>姓名："+feature.trafficInfo.userName+"<br>电话："+dhhm+"<br><a  id='callButton' class='but-small but-green'><i class='fa fa-volume-off'></i> 呼叫</a></div>",
+	                   null,
+	                   false
+	               );
+	               feature.popup = popup;
+	               mapObj_event.addPopup(popup);
+				    var groupHtml =$(popup.contentDiv);
+	               
+				   groupHtml.find("#callButton").unbind();
+				   groupHtml.find("#callButton").bind("click",function(evt){
+						var postData={
+							"event":"STATION",
+							"extend":{"eventswitch":"load"},
+							"content":{"condition":{"uid":feature.trafficInfo.m350id}}
+						};
+					var Loader=new AJAXObj();
+					$(Loader).bind("JSON_LOADED",function(e,backJson){	
+						var result = backJson['value'];
+						$.message(result);
+						mapObj_event.removePopup(feature.popup);
+						feature.popup.destroy();
+						feature.popup = null;
+					});
+					$(Loader).bind("SYS_ERROR",function(e,msg){
+						$.error(msg);
+					});
+					Loader.POSTDATA("php/out/DsServer.php",postData);
+				   });
+	           },
+	           'featureunselected':function(evt){
+	               var feature = evt.feature;
+	               mapObj_event.removePopup(feature.popup);
+	               feature.popup.destroy();
+	               feature.popup = null;
+	           }
+	       }
+	     return eventListeners;
+	}
+	
+	function mobileListener(){
+		var eventListeners_mobile = {
+		   'featureselected':function(evt){
+			   var feature = evt.feature;
+			   var dhhm = feature.gpsInfo.dhhm!=null?feature.gpsInfo.dhhm:"";
+			   var orgName = util.getOrgNameById(feature.gpsInfo.orgCode);
+			   if(!orgName)orgName = feature.gpsInfo.orgName;
+			   var popup = new OpenLayers.Popup.FramedCloud("popup",
+				   OpenLayers.LonLat.fromString(feature.geometry.toShortString()),
+				   null,
+				   "<div style='font-size:.9em'>移动警务<br>——————————————————<br>设备号："+feature.gpsInfo.deviceId+"<br>姓名："+feature.gpsInfo.userName+"<br>部门："+orgName+"<br>电话："+dhhm+"<br>速度："+feature.gpsInfo.speed+"&nbsp;km/h<br>方向："+feature.gpsInfo.directionZh+"<br>时间："+feature.gpsInfo.locateTime+"</div>",
+				   null,
+				   false
+			   );
+			   feature.popup = popup;
+			   mapObj_event.addPopup(popup);
+		   },
+		   'featureunselected':function(evt){
+			   var feature = evt.feature;
+			   mapObj_event.removePopup(feature.popup);
+			   feature.popup.destroy();
+			   feature.popup = null;
+		   }
+		}
+		return eventListeners_mobile;
+	}
+	
+	function kkListener(){
+		var eventListeners = {
+	           'featureselected':function(evt){
+	               var feature = evt.feature;
+	               var popup = new OpenLayers.Popup.FramedCloud("popup",
+	                   OpenLayers.LonLat.fromString(feature.geometry.toShortString()),
+	                   null,
+	                   "<div style='font-size:.9em'>卡口信息<br>——————————————————<br>卡口名称："+feature.info.kkmc+"<br>单向车道数量："+feature.info.dxcdsl+"<br>摄像头数量："+feature.info.sxtsl+"<br>所属单位："+feature.info.ssdw+"</div>",
+	                   null,
+	                   false
+	               );
+	               feature.popup = popup;
+	               mapObj.addPopup(popup);
+	           },
+	           'featureunselected':function(evt){
+	               var feature = evt.feature;
+	               mapObj.removePopup(feature.popup);
+	               feature.popup.destroy();
+	               feature.popup = null;
+	           }
+	       }
+		return eventListeners;
+	}
+	
+	function jwgzzListener(){
+		var eventListeners = {
+	           'featureselected':function(evt){
+	               var feature = evt.feature;
+	               var popup = new OpenLayers.Popup.FramedCloud("popup",
+	                   OpenLayers.LonLat.fromString(feature.geometry.toShortString()),
+	                   null,
+	                   "<div style='font-size:.9em'>警务工作站<br>——————————————————<br>名称："+feature.info.dwmc+"<br>负责人姓名："+feature.info.fzrxm+"<br>负责人电话："+feature.info.fzrdh+"<br>所在地派出所："+feature.info.szdpcs+"<br>派出所电话："+feature.info.szpcsdh+"<br>上级机关："+feature.info.sjjg+"<br>警力配置："+feature.info.jlpz+"<br>车辆配备："+feature.info.clpb+"</div>",
+	                   null,
+	                   false
+	               );
+	               feature.popup = popup;
+	               mapObj.addPopup(popup);
+	           },
+	           'featureunselected':function(evt){
+	               var feature = evt.feature;
+	               mapObj.removePopup(feature.popup);
+	               feature.popup.destroy();
+	               feature.popup = null;
+	           }
+	       }
+		return eventListeners;
+	}
+	
+	function cameraListener(){
+		var eventListeners = {
+	           'featureselected':function(evt){
+	               var feature = evt.feature;
+	               var popup = new OpenLayers.Popup.FramedCloud("popup",
+	                   OpenLayers.LonLat.fromString(feature.geometry.toShortString()),
+	                   null,
+						   "<div style='font-size:.9em'>摄像头<br>——————————————————<br>点位名称:"+feature.info.dwmc+"<br>编号: " + feature.info.xtidbm + "<br>安装部位: " + feature.info.azbw+"<br>——————————————————<br><a  id='spjkButton' class='but-small but-green'><i class='fa fa-video-camera'></i> 实时监控</a></div>",
+	                   null,
+	                   false
+	               );
+	               feature.popup = popup;
+	               mapObj.addPopup(popup);
+	               var eventHtml =$(popup.contentDiv);
+	               
+	               eventHtml.find("#spjkButton").unbind();
+	               eventHtml.find("#spjkButton").bind("click",function(evt){
+							try{
+	               				var url = 'http://10.80.128.83/modules/thirdParty/playwin.jsp?cameraIndexCode='+feature.info.xtidbm;
+								window.showModalDialog(url,"camWindow","dialogWidth:800px;dialogHeight:500px;toolbar:yes,menubar:yes");
+							
+							}catch(e){
+							
+							
+							}
+	               });
+	           },
+	           'featureunselected':function(evt){
+	               var feature = evt.feature;
+	               mapObj.removePopup(feature.popup);
+	               feature.popup.destroy();
+	               feature.popup = null;
+	           }
+	       }
+		return eventListeners;
+	}
+	
+	function eventListener(){
+		var mapControl = new MapControl();
+		var ourResource = new OutResource();
+		var eventListeners_event = {
+	           'featureselected':function(evt){
+	               var feature = evt.feature;
+	               var popup = new OpenLayers.Popup.FramedCloud("event_popup",
+	                   OpenLayers.LonLat.fromString(feature.geometry.toShortString()),
+	                   null,
+	                    '<div id="popupRouteContent"><div style="font-size:.9em">报警内容：'+feature.trafficInfo.bjnr+'<br>警情地址：'+feature.trafficInfo.jqdd+'<br>报警时间：'+feature.trafficInfo.bjsj+'</div>——————————————————<div id="routeForm"><table border="3" cellspacing="0" cellpadding="0"  class="formtab"><tr><th align="right"><i>周边资源</i></th><td><input type="text" name="roundMiter" id="roundMiter" class="check_number must"  style="width:80px" />米</td><td align="center"><a  id="SaveButton" class="but-small but-red"><i class="fa fa-search"></i> 确定</a> </td></tr>'
+	                    +'</table></div></div>',
+	                   null,
+	                   false
+	               );
+	               feature.popup = popup;
+	               mapObj_event.addPopup(popup);
+	               var eventHtml =$(popup.contentDiv);
+	               
+	               eventHtml.find("#SaveButton").unbind();
+				   eventHtml.find("#SaveButton").bind("click",function(evt){
+				   		SubmitForm=new formDeal(eventHtml.find("#routeForm"));
+				   		var mapObj = mainWindow.mapObj;
+				   		if(SubmitForm.check()){
+				   			var miter = eventHtml.find("#roundMiter").val();
+				   			var radiusMarker = new OpenLayers.LonLat(feature.geometry.x,feature.geometry.y);
+				   			mobileLayer.removeAllFeatures();
+				   			jwgzzLayer.removeAllFeatures();
+				   			mobileRoundTemp = new Array();
+				   			jwgzzRoundTemp = new Array();
+				   			kkRoundTemp = new Array();
+				   			var mobileStore = mainWindow.mobileStore;
+				   			for (var i=0;i<mobileStore.length;i++) {
+				   				var mobileMarker = new OpenLayers.LonLat(mobileStore[i]['ft'].geometry.x,mobileStore[i]['ft'].geometry.y);
+				   				var radius = OpenLayers.Util.distVincenty(radiusMarker,mobileMarker)*1000; //换成米
+				   				if(radius<miter*1+100){
+				   					var feature_mobile = updateMobileMarker(mobileStore[i]);
+				   					mobileStore[i]['dynamic_bz']=mobileStore[i].userName;
+									mobileStore[i]['dynamic_feature']=feature_mobile;
+				   					mobileRoundTemp.push(mobileStore[i]);
+				   				}
+				   			}
+				   			var jwgzzFeatures = mainWindow.jwgzzFeatures;
+				   			for (var i=0;i<jwgzzFeatures.length;i++) {
+				   				var jwgzzMarker = new OpenLayers.LonLat(jwgzzFeatures[i].geometry.x,jwgzzFeatures[i].geometry.y);
+				   				var radius = OpenLayers.Util.distVincenty(radiusMarker,jwgzzMarker)*1000; //换成米
+				   				if(radius<miter*1+100){
+				   					jwgzzFeatures[i]['dynamic_bz']=jwgzzFeatures[i]['info'].dwmc;
+									jwgzzFeatures[i]['dynamic_feature']=jwgzzFeatures[i];
+				   					jwgzzRoundTemp.push(jwgzzFeatures[i]);
+				   				}
+				   			}
+				   			jwgzzLayer.addFeatures(jwgzzRoundTemp);
+				   			
+				   			var kkFeatures = mainWindow.kkFeatures;
+				   			for (var i=0;i<kkFeatures.length;i++) {
+				   				var kkMarker = new OpenLayers.LonLat(kkFeatures[i].geometry.x,kkFeatures[i].geometry.y);
+				   				var radius = OpenLayers.Util.distVincenty(radiusMarker,kkMarker)*1000; //换成米
+				   				if(radius<miter*1+100){
+				   					kkFeatures[i]['dynamic_bz']=kkFeatures[i]['info'].kkmc;
+									kkFeatures[i]['dynamic_feature']=kkFeatures[i];
+				   					kkRoundTemp.push(kkFeatures[i]);
+				   				}
+				   			}
+				   			kkLayer.addFeatures(kkRoundTemp);
+				   			
+				   			mobileLayer.setVisibility(true);
+				   			MulitContainer.openPannalById("slideWraper");
+				   			loadGPSMobile();
+				   			mapObj_event.removePopup(feature.popup);
+				   			feature.popup.destroy();
+	             			feature.popup = null;
+				   		}
+				   });
+				    
+	           },
+	           'featureunselected':function(evt){
+	               var feature = evt.feature;
+	               if(feature.popup){
+		               mapObj_event.removePopup(feature.popup);
+		               feature.popup.destroy();
+		               feature.popup = null;
+	               }
+	           }
+	       }
+	       return eventListeners_event;
+	}
+	
+	function updateMobileMarker(gpsInfo) {
+		var lineArr = null;
+		var point = null;
+		var img = "images/zhdd/"+gpsInfo.iconSrc;
+		point = OpenLayers.Geometry.fromWKT(gpsInfo.location);
+		var ft = new OpenLayers.Feature.Vector();
+		ft.geometry = point;
+		ft.style = {
+			cursor: "pointer",
+			label: gpsInfo.userName,
+			fontWeight: "bold",
+			fontColor:"#ffffff",
+			labelOutlineWidth: 3,
+			labelOutlineColor: "#4089be",
+			labelYOffset:-26,
+			labelXOffset:0,
+			graphicWidth:32,   
+			graphicHeight : 32,   
+			graphicXOffset : -16,   
+			graphicYOffset : -16, 
+			externalGraphic : img
+		};
+		ft.gpsInfo = gpsInfo;
+		mobileLayer.addFeatures(ft);
+		//removeMobileFeatrue();
+		return ft;
+	}
+	
+	function loadGPSMobile(){
+		mobileLayer.setVisibility(true);
+		DataGrid.datagrid('loadData', [{"dynamic_bz":"1"}]);
+		DataGrid.datagrid('loadData', mobileRoundTemp);
+		//p.find("#tt").datagrid("loadData",record);
+	}
+	
+	function loadJwgzzData(){
+		jwgzzLayer.setVisibility(true);
+		DataGrid.datagrid('loadData', [{"dynamic_bz":"1"}]);
+		DataGrid.datagrid('loadData', jwgzzRoundTemp);
+		//p.find("#tt").datagrid("loadData",record);
+	}
+	
+	function loadKkData(){
+		kkLayer.setVisibility(true);
+		DataGrid.datagrid('loadData', [{"dynamic_bz":"1"}]);
+		DataGrid.datagrid('loadData', kkRoundTemp);
+		//p.find("#tt").datagrid("loadData",record);
+	}
+	
+	function changePoupVisible(obj){
+	  var layer = obj.layer;
+	  var property= obj.property;
+	  if(property=="visibility"){
+  			var features = layer.features;
+  			for(var i=0;i<features.length;i++){
+  				var feature = features[i];
+  				if(feature.popup){
+			   		mapObj_event.removePopup(feature.popup);
+			   		feature.popup.destroy();
+			   		feature.popup = null;
+		   		}
+		   }
+	  	}
+	}	
+	
+	/**
+	 * addEventDataMarker
+	 * 添加警情点覆盖物
+	 */
+	function addEventDataMarker(trafficInfo,mode) {
+		
+		var lineArr = null;
+		var point = null;
+		var img = mapUtil.checkEventImg(trafficInfo);
+		var jqclzt = trafficInfo.jqclzt;
+		var location = "";
+		if(jqclzt=="4"||jqclzt=="5"){
+			location = trafficInfo.jqjqzb;
+		}else{
+			location = trafficInfo.mhjqzb;
+		}
+		point = OpenLayers.Geometry.fromWKT(location);
+	
+		if(mode){
+				var lonlat = new OpenLayers.LonLat(point.x, point.y); 
+				var info = mapUtil.findRecord("jqid",trafficInfo['jqid'],eventStore);
+			if(info){
+				var fv = info.dynamicMarker;
+				if(fv){
+					fv.style.externalGraphic=img;
+					fv.trafficInfo = trafficInfo;
+					fv.move(lonlat);
+				}
+				if (fv&&fv.popup) {
+					fv.popup.lonlat = lonlat;
+					fv.popup.updatePosition();
+				}
+			}
+		}else{
+			var featureMarker = new OpenLayers.Feature.Vector();
+				featureMarker.geometry = point;
+					featureMarker.style = {
+						cursor: "pointer",
+						graphicWidth:32,   
+						graphicHeight : 32,   
+						graphicXOffset : -16,   
+						graphicYOffset : -16, 
+						externalGraphic : img
+					};
+			featureMarker.trafficInfo = trafficInfo;
+			trafficInfo.dynamicMarker = featureMarker;
+			eventDetailLayer.addFeatures(featureMarker);
+			eventStore.push(trafficInfo);
+		}
+	}
+	
+	
+	function eventJqtz(e,data,initBs)
+	{
+		 var jqid = data.jqid;
+		 var jqzt  = data.jqclzt;
+		 if(jqid!=record['jqid']){
+		 	return;
+		 }
+		 if(jqzt!=null&&jqzt=='1')
+		 {
+			 $(Detailobj).one("HTML_FORMATED",getFormData);
+			 detailAccBox.disableBar(3,true,"（尚无处警单）");//禁止第2个展开
+			 detailAccBox.disableBar(4,true,"（尚无反馈）");//禁止第3个展开
+			 detailAccBox.disableBar(5,true,"（尚无警情辅助）");//禁止第3个展开
+		 }
+		 else
+		 {	
+		 	getDynamicGroupData();
+		 	addEventDataMarker(data,true);
+		 	getFormDataEnd();
+		 	getFormDatafeedBack(data.jqid);
+		 	// $(Detailobj).one("HTML_FORMATED",getFormDataEnd);
+			// $(Detailobj).one("HTML_FORMATED",function(){getFormDatafeedBack(data.jqid)});
+			//不是初始化的时候 
+			if(initBs!="1")
+			{
+				if(jqzt!=null&&jqzt!='5')
+				{
+					detailAccBox.disableBar(3,false);
+					//detailAccBox.setFlash(3,true);//加闪烁
+					detailAccBox.disableBar(4,true,"（尚无反馈）");//禁止第3个展开
+			 		detailAccBox.disableBar(5,true,"（尚无警情辅助）");//禁止第3个展开
+				}
+				else
+				{	
+					detailAccBox.disableBar(3,false);//禁止第2个展开
+					detailAccBox.disableBar(4,false);//禁止第3个展开
+					detailAccBox.disableBar(5,false);//禁止第3个展开
+					//detailAccBox.setFlash(3,true);//加闪烁
+					//detailAccBox.setFlash(4,true);
+					//detailAccBox.setFlash(5,true);
+				}
+				 
+			}
+			//是初始化的时候
+			else
+			{
+				
+				if(jqzt!=null&&jqzt=='5')
+				{
+					detailAccBox.disableBar(3,false);
+					detailAccBox.disableBar(4,false);//禁止第3个展开
+					detailAccBox.disableBar(5,false);//禁止第3个展开	
+				}
+				else
+				{
+					detailAccBox.disableBar(3,false);
+					detailAccBox.disableBar(4,true,"（尚无反馈）");//禁止第3个展开
+			 		detailAccBox.disableBar(5,true,"（尚无警情辅助）");//禁止第3个展开
+				}
+			}
+			getFormData_CJD(data.jqid);
+			/*
+			 $(detailAccBox).bind("ACC_LOAD",function(e,Vars){
+			 switch(Vars["id"]){
+				case "part_3":
+					//处警单局部加载-----
+					getFormData_CJD(data.jqid,Vars["callback"]);
+					break;
+			}
+		})
+		    */
+		 }
+		record.jqclzt=data.jqclzt;
+		p.CONDITION["newrecord"].jqclzt=data.jqclzt;
+		 
+	}
+	
+	function loadDynamicGroup(){
+		for (var i=0;i<groupStore.length;i++) {
+			    var info = mapUtil.findRecord("hphm",groupStore[i]['hphm'],mainWindow.stationGroupStore);
+				if (info) {
+						info.dynamicMarker = groupStore[i]['dynamicMarker'];
+						addDataMarker(info,true);
+						ljfxClick(info);
+				} 
+		}
+	}
+	
+	//编辑状态，获取数据
+	function getDynamicGroupData(){
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){
+		    for (var i=0;i<backJson["value"].length;i++) {
+		    	var falg = checkHphmContain(backJson["value"][i]['hphm']);
+		    	if(falg==false){
+				    var info = mapUtil.findRecord("hphm",backJson["value"][i]['hphm'],mainWindow.stationGroupStore);
+					if (info) {
+							addDataMarker(info,false);
+							groupStore.push(info);
+					} 
+				}
+			}
+		})
+		Loader.POSTDATA("php/event/GetDynamicGroup_web.php",{"event":"FormEdit","content":{"condition":{"jqid":record['jqid']}},"extend":{}});				
+	}
+	
+	function checkHphmContain(hphm){
+		for (var i=0;i<groupStore.length;i++) {
+			if(hphm==groupStore[i]['hphm']){
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	function moveAni(ft, lonlat) {
+		if (ft.ani_interval) {
+			clearInterval(ft.ani_interval);
+		}
+
+		ft.ani_to_x = lonlat.lon;
+		ft.ani_to_y = lonlat.lat;
+		ft.ani_from_x = ft.geometry.x;
+		ft.ani_from_y = ft.geometry.y;
+		ft.ani_pts = 100;//动画节点数,数值越大,动画越顺畅
+		ft.ani_px = (ft.ani_to_x - ft.ani_from_x) / ft.ani_pts; //各节点经度的间隔距离
+		ft.ani_py = (ft.ani_to_y - ft.ani_from_y) / ft.ani_pts; //各节点纬度的间隔距离
+
+		//动画过程中
+		ft.ani_ci = 0;//当前所处节点编号
+		ft.ani_cx = ft.ani_from_x;//当前所处节点经度
+		ft.ani_cy = ft.ani_from_y;//当前所处节点纬度
+		ft.moveInterval();
+		ft.ani_interval = setInterval(function(){ft.moveInterval();},10);
+	}
+	
+	/**
+	 * addMarker
+	 * 添加警员点覆盖物
+	 */
+	
+	function addDataMarker(trafficInfo,mode) {
+		var lineArr = null;
+		var point = null;
+		var img = "images/zhdd/"+trafficInfo.iconSrc;
+		point = OpenLayers.Geometry.fromWKT(trafficInfo.location);
+	
+		if(mode){
+			var lonlat = new OpenLayers.LonLat(point.x, point.y); 
+			var fv = trafficInfo.dynamicMarker;
+			fv.style.externalGraphic=img;
+			fv.trafficInfo = trafficInfo;
+			//fv.move(lonlat);
+			moveAni(fv, lonlat);
+			if (fv&&fv.popup) {
+				var dhhm = fv.trafficInfo.dhhm?fv.trafficInfo.dhhm:"";
+				var deviceType = util.getDeviceType(fv.trafficInfo.deviceType);
+				//"<div style='font-size:.9em'>巡逻组<br>——————————————————<br>车牌号："+feature.trafficInfo.hphm+"<br>品牌："+feature.trafficInfo.pp+"<br>定位设备编号："+feature.trafficInfo.deviceId+"<br>定位设备类型："+deviceType+"<br>速度："+feature.trafficInfo.speed+"&nbsp;km/h<br>方向："+feature.trafficInfo.directionZh+"<br>部门："+feature.trafficInfo.orgName+"<br>时间："+feature.trafficInfo.locateTime+"<br>姓名："+feature.trafficInfo.userName+"<br>电话："+dhhm+"<br><a  id='callButton' class='but-small but-green'><i class='fa fa-volume-off'></i> 呼叫</a></div>",
+				fv.popup.setContentHTML("<div style='font-size:.9em'>巡逻组<br>——————————————————<br>车牌号："+fv.trafficInfo.hphm+"<br>品牌："+fv.trafficInfo.pp+"<br>定位设备编号："+fv.trafficInfo.deviceId+"<br>定位设备类型："+deviceType+"<br>速度："+fv.trafficInfo.speed+"&nbsp;km/h<br>方向："+fv.trafficInfo.directionZh+"<br>部门："+fv.trafficInfo.orgName+"<br>时间："+fv.trafficInfo.locateTime+"<br>姓名："+fv.trafficInfo.userName+"<br>电话："+dhhm+"<br><a  id='callButton' class='but-small but-green'><i class='fa fa-volume-off'></i> 呼叫</a></div>");
+			}
+		}else{
+		var featureMarker = new OpenLayers.Feature.Vector();
+					featureMarker.geometry = point;
+					featureMarker.style = {
+						cursor: "pointer",
+						label: trafficInfo.hphm,
+						fontWeight: "bold",
+						fontColor:"#ffffff",
+						labelOutlineWidth: 3,
+						labelOutlineColor: "#4089be",
+						labelYOffset:-26,
+						labelXOffset:0,
+						graphicWidth:32,   
+						graphicHeight : 32,   
+						graphicXOffset : -16,   
+						graphicYOffset : -16, 
+						externalGraphic : img
+					};
+		featureMarker.trafficInfo = trafficInfo;
+		trafficInfo.dynamicMarker = featureMarker;
+		groupLayer.addFeatures(featureMarker);
+			//创建动画过程函数
+			featureMarker.moveInterval = function() {
+				this.ani_cx = this.ani_cx + this.ani_px;
+				this.ani_cy = this.ani_cy + this.ani_py;
+				var lonlat = new OpenLayers.LonLat(this.ani_cx, this.ani_cy);
+				this.move(lonlat);
+				if (this.popup) {
+					this.popup.lonlat = lonlat;
+					this.popup.updatePosition();
+				}
+				this.ani_ci++;
+				if (this.ani_ci==this.ani_pts) {
+					clearInterval(this.ani_interval);
+					var lonlat = new OpenLayers.LonLat(this.ani_to_x, this.ani_to_y);
+					this.move(lonlat);
+				}
+			}
+		}
+		//removeGroupFeatrue();
+	}
+	
+	//编辑状态，获取数据
+	function getFormData(){
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){
+		  record= backJson["value"]['records'];
+			var jqclzt = util.getJqclzt(record.jqclzt);
+			var bjfs = util.getBjfs(record.bjfs);
+			var jjlx = util.getJjlx(record.jjlx);
+			var jjfs = util.getJjfs(record.jjfs);
+			var ajlx = util.getAjlx(record.jqlxdm);
+			var ajlb = util.getAjlb(record.jqlbdm);
+			var xb = util.getSex(record.bjrxbdm);
+			Detailobj.bindData(record);//绑定数据
+			bjxxobj.bindData(record);	
+			p.find("#jqclzt").text(jqclzt);
+			p.find("#bjfs").text(bjfs);
+			p.find("#jjlx").text(jjlx);
+			p.find("#jjfs").text(jjfs);
+			p.find("#jqlxdm").text(ajlx);
+			p.find("#jqlbdm").text(ajlb);
+			p.find("#bjrxbdm").text(xb);
+			//从新修改后赋值不成功的部分从新赋值
+			//var address = p.find("#jqdd").text();
+			//p.getDefaultLocation(address);
+		})
+		Loader.POSTDATA("php/event/GetNormalEventById_web.php",{"event":"FormEdit","content":{"condition":{"jqid":record['jqid']}},"extend":{}});				
+	}	
+	
+	function getFormDataEnd(){
+		//alert(123);
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){	
+			record= backJson["value"]['records'];
+			var jqclzt = util.getJqclzt(record.jqclzt);
+			var bjfs = util.getBjfs(record.bjfs);
+			var jjlx = util.getJjlx(record.jjlx);
+			var jjfs = util.getJjfs(record.jjfs);
+			var ajlx = util.getAjlx(record.jqlxdm);
+			var ajlb = util.getAjlb(record.jqlbdm);
+			var xb = util.getSex(record.bjrxbdm);
+			record['jqzk']=JSON.parse("["+record['jqzk']+"]");
+			Detailobj.bindData(record);//绑定数据	
+			bjxxobj.bindData(record);
+			fjxxobj.bindData(record);
+			p.find("#bmdm_text").val(record.orgname);
+			p.find("#bmdm").readonly();
+			p.find("#jqdjdm").readonly();
+			p.find("[name=jqzk]").readonly();
+			p.find("#jqclzt").text(jqclzt);
+			p.find("#bjfs").text(bjfs);
+			p.find("#jjlx").text(jjlx);
+			p.find("#jjfs").text(jjfs);
+			p.find("#jqlxdm").text(ajlx);
+			p.find("#jqlbdm").text(ajlb);
+			//p.find("#jqdjdm").text(jqdj);
+			p.find("#bjrxbdm").text(xb);
+			var processRecords = record['processRecords'];
+			
+			p.find("#tt").datagrid("loadData",processRecords);
+			//getFormDatafeedBack(record.jqid);	
+		})
+		Loader.POSTDATA("php/event/GetEventById_web.php",{"event":"FormEdit","content":{"condition":{"jqid":record['jqid']}},"extend":{}});				
+		
+	}
+	
+		//编辑状态，获取数据
+	function getFormDatafeedBack(jqid){ 
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){ //alert(backJson)
+			feedBackRecord= backJson["value"]['records'];
+			if(!feedBackRecord)
+				return;
+				
+			//feedBackRecord.belong="1";
+			//feedBackRecord.scene="1";
+			p.find("[name=belong]").readonly(false);
+	        p.find("[name=scene]").readonly(false);
+			fkuiObj.bindData(feedBackRecord);//绑定数据
+			feedBackData(jqid);
+			p.find("[name=belong]").readonly();
+	        p.find("[name=scene]").readonly();
+			//var aa=  $.extend({},j1,j2)
+			p.find("#part_4").find("#hzdjdm_fk").text(feedBackRecord.hzdjdm);
+			p.find("#part_4").find("#qhwdm_fk").text(feedBackRecord.qhwdm);
+			p.find("#part_4").find("#qhjzjgdm_fk").text(feedBackRecord.qhjzjgdm);
+			p.find("#part_4").find("#hzcsdm_fk").text(feedBackRecord.hzcsdm);
+			p.find("#part_4").find("#ssrs_fk").text(feedBackRecord.ssrs);
+			p.find("#part_4").find("#swrs_fk").text(feedBackRecord.swrs);		
+		})
+		Loader.POSTDATA("php/event/GetFeedbackByJqid.php",{"event":"FormEdit","content":{"condition":{"jqid":jqid}},"extend":{}});				
+		
+	}
+	
+	function feedBackData(jqid){
+		var Loader_resouce=new AJAXObj();
+		$(Loader_resouce).bind("JSON_LOADED",function(e,backJson){	
+			var records= backJson["value"]['records'];
+			if(records.length>0){
+				var imgObj = "";
+				var andioObj = "";
+				for(var i=0;i<records.length;i++){
+					if(imgObj==""&&records[i]['zylx']=="1"){
+						imgObj+=records[i]['zydz'];
+						continue;
+					}else if(andioObj==""&&records[i]['zylx']=="2"){
+						andioObj+=records[i]['zydz'];
+						continue;
+					}
+					
+					if(records[i]['zylx']=="1"){
+						imgObj+=","+records[i]['zydz'];
+					}else if(records[i]['zylx']=="2"){
+						andioObj+=","+records[i]['zydz'];
+					}
+				}
+				//alert(imgObj);
+				p.find("#imgTd").changeValue(imgObj); //alert(p.find("#imgAudio").length)
+				p.find("[name=imgAudio]").changeValue(andioObj);
+			}
+		})
+		Loader_resouce.POSTDATA("php/event/GetFileByJqid_web.php",{"event":"FormEdit","content":{"condition":{"jqid":jqid}},"extend":{}});
+	}
+	//获取处警单数据
+	function getFormData_CJD(jqid,callback){
+		//alert(12312312);
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){	
+			var listData=backJson["value"]['records'];			
+			chuJingDan.clear();
+			for(var i=0;i<listData.length;i++){
+				//插入处警单
+				listData[i].cjdzt=util.getCjdzt(listData[i].cjdzt);
+				chuJingDan.addChuJingDan(listData[i],"cjd_"+i);
+				//插入指令单
+				var zlddata=listData[i]["commandRecords"];
+				for(var j=0;j<zlddata.length;j++){
+					zlddata[j].jqztdm=util.getJqclzt(zlddata[j].jqztdm);
+					zlddata[j].zlbs=util.getZlbs(zlddata[j].zlbs);
+					var zhilingdan=chuJingDan.addZhiLingDan("cjd_"+i,zlddata[j]);
+					if(zlddata[j].zlbs=="增援")
+					{
+						zhilingdan.find("tr.zyzlDeleteSj").hide();
+					}
+					if(zlddata[j].zlbs=="首接"){
+						zhilingdan.find("tr.zlnrDeleteSj").hide();
+					}
+				}
+			}
+			//callback();//回调展开
+		})
+		Loader.POSTDATA("php/event/GetProcessById_web.php",{"event":"FormEdit","content":{"condition":{"jqid":jqid}},"extend":{}});				
+	}
+	
+	function pagerFilter(data){
+			if (typeof data.length == 'number' && typeof data.splice == 'function'){	// is array
+				data = {
+					total: data.length,
+					rows: data
+				}
+			}
+			var dg = $(this);
+			var opts = dg.datagrid('options');
+			var pager = dg.datagrid('getPager');
+			pager.pagination({
+				onSelectPage:function(pageNum, pageSize){
+					opts.pageNumber = pageNum;
+					opts.pageSize = pageSize;
+					pager.pagination('refresh',{
+						pageNumber:pageNum,
+						pageSize:pageSize
+					});
+					dg.datagrid('loadData',data);
+				}
+			});
+			if (!data.originalRows){
+				data.originalRows = (data.rows);
+			}
+			var start = (opts.pageNumber-1)*parseInt(opts.pageSize);
+			var end = start + parseInt(opts.pageSize);
+			data.rows = (data.originalRows.slice(start, end));
+			return data;
+	}
+	
+	//datagrid行点击
+	function dataGridClick(rowIndex,rowData){ 
+		var controls = mapObj_event.controls;
+		var selectFeature = null;
+		for(var i=0;i<controls.length;i++){
+			if(controls[i].CLASS_NAME=="OpenLayers.Control.SelectFeature"){
+				selectFeature = controls[i];
+				break;
+			}
+		}
+		if(selectFeature){
+			//debugger;
+			selectFeature.unselectAll();
+			selectFeature.select(rowData.dynamic_feature);
+			MulitContainer.closePannalById("slideWraper");
+			var lonlat = new OpenLayers.LonLat(rowData.dynamic_feature.geometry.x,rowData.dynamic_feature.geometry.y);
+			mapObj_event.setCenter(lonlat);
+		}
+	}
+	
+	function ljfxClick(groupInfo){
+		debugger;
+		var info = mapUtil.findRecord("jqid",record['jqid'],eventStore);
+		var event_x = info.dynamicMarker.geometry.x;
+		var event_y = info.dynamicMarker.geometry.y;
+		var group_x = "";
+		var group_y = "";
+		var groupMarker =groupInfo['location'];
+	 	var point = OpenLayers.Geometry.fromWKT(groupMarker);
+	 	group_x = point.x;
+	 	group_y = point.y;
+	 	var lastPoint = "";
+	 	for (var i=0;i<lastGroupStore.length;i++) {
+			if(lastGroupStore[i]['hphm']==groupInfo['hphm']){
+				lastPoint = lastGroupStore[i]['point'];
+				break;
+			}
+		}
+		if(lastPoint!=""){
+		 	var resolution = mapObj_event.getResolution();
+		 	var lonlat = new OpenLayers.LonLat(point.x,point.y);
+		 	var sumDis = OpenLayers.Util.distVincenty(lonlat,lastPoint);
+		 	if (sumDis*1000>resolution*24){
+				onPathAnalysis(event_x,event_y,group_x,group_y,groupInfo['hphm'],false);
+				for (var i=0;i<lastGroupStore.length;i++) {
+					if(lastGroupStore[i]['hphm']==groupInfo['hphm']){
+						lastGroupStore[i]['point'] = lonlat;
+						break;
+					}
+				}
+			}
+		}else{
+			var lonlat = new OpenLayers.LonLat(point.x,point.y);
+			var obj = {};
+			obj['hphm']=groupInfo['hphm'];
+			obj['point']= lonlat;
+			lastGroupStore.push(obj);
+			onPathAnalysis(event_x,event_y,group_x,group_y,groupInfo['hphm'],true);
+		}
+		
+	
+	}
+	
+	function onPathAnalysis(event_x,event_y,group_x,group_y,hphm,mode) {
+		for (var i=0;i<ljfxFeatures.length;i++) {
+			if(ljfxFeatures[i]['hphm']==hphm){
+				ljfxLayer.removeFeatures([ljfxFeatures[i]['feature']]);
+				break;
+			}
+		}
+		/*
+		var lineStr = "LINESTRING(121.614648581163 38.9107016976856,121.615856309915 38.9109577284998,121.615929447507 38.9109765415887,121.615929447507 38.9109765415887,121.616144903326 38.9103886588908,121.616144903326 38.9103886588908,121.616439855753 38.9096551712792,121.616532522646 38.9094352548379,121.616532522646 38.9094352548379,121.616706587555 38.9088076832119,121.617064187347 38.9079372400628,121.617064187347 38.9079372400628,121.6173399331 38.9079369864995,121.61811157794 38.9077666405916,121.618182850949 38.907767484029,121.618566933327 38.9077720284706,121.618752117546 38.9077985702926,121.618752117546 38.9077985702926,121.619131719734 38.9078529764021,121.619555099364 38.907873454735,121.619733210982 38.9078755602061,121.619733210982 38.9078755602061,121.62018071942 38.9078808490382,121.620621917832 38.9078787750196,121.620621917832 38.9078787750196,121.621641899551 38.9078739738269,121.6221692162 38.9078726745069,121.6221692162 38.9078726745069,121.622229601625 38.9078725255638,121.622229601625 38.9078725255638,121.623825750309 38.9078685772707,121.624114829465 38.9078613178173,121.624114829465 38.9078613178173,121.626193670275 38.9078090921169,121.626574122053 38.907759106991,121.627241410317 38.907694339509,121.627665292736 38.9075697818817,121.627665292736 38.9075697818817,121.627974035529 38.9074790567191,121.628062556689 38.9074589974026,121.628106883041 38.9074384666856,121.628106883041 38.9074384666856,121.628337966241 38.9073314349912,121.62880371634 38.9071756963723,121.62880371634 38.9071756963723,121.628988493343 38.9071139094906,121.629578055825 38.9070693636966,121.630206861012 38.907124991256,121.630383473989 38.9071463627494,121.630566663659 38.907124085064,121.630566663659 38.907124085064,121.63069708552 38.9071082242845,121.631002390572 38.907000000219,121.631255913563 38.9068721915899,121.631529516521 38.9067043775447,121.631704258991 38.9066561250177,121.631778505611 38.9066348994125,121.631778505611 38.9066348994125,121.632008496964 38.9065691491588,121.632323869973 38.9065728433282,121.632715223418 38.9066428166187,121.63350022895 38.9068804947399,121.63350022895 38.9068804947399,121.633752104159 38.9069567541922,121.634156061637 38.9071505612664,121.634244325304 38.9071948099688,121.634244325304 38.9071948099688,121.634332225658 38.9072388764142,121.634332225658 38.9072388764142,121.634331716166 38.907228092701,121.634434288197 38.9072538670849,121.634697195152 38.907472710016,121.634697195152 38.907472710016,121.635143427479 38.9078441480356,121.635143427479 38.9078441480356,121.635157447872 38.9078558183398,121.635329693887 38.9079648554312,121.635403367467 38.9080192283983,121.635607018768 38.908103027835,121.635607018768 38.908103027835,121.635804908903 38.9081844561141,121.63639547667 38.9082203305474,121.636945439423 38.9082186950218,121.636945439423 38.9082186950218,121.636991166218 38.9082185589189,121.636991166218 38.9082185589189,121.640306759985 38.9079190681897,121.640306759985 38.9079190681897,121.645453545756 38.9074539775697,121.645453545756 38.9074539775697,121.652499490362 38.9068168900491,121.652638874381 38.9068074046845,121.652679805939 38.906807876955,121.652679805939 38.906807876955,121.653086146647 38.9068125645567,121.653222441914 38.9068119519301,121.653222441914 38.9068119519301,121.653451637875 38.9068109213699,121.653451637875 38.9068109213699,121.653717082592 38.9068097272576,121.653961011237 38.9068829495499,121.653961011237 38.9068829495499,121.65398707465 38.9068770078164,121.654178548756 38.9068850481871,121.654747107421 38.9068969417479,121.654747107421 38.9068969417479,121.655536433346 38.9069134488979,121.655536433346 38.9069134488979,121.656018103929 38.9069235194359,121.657917182682 38.906975252146,121.657917182682 38.906975252146,121.658201547112 38.9068986927426,121.658260966273 38.906903949658,121.658260966273 38.906903949658,121.658833385533 38.9069545909884,121.659475521867 38.90701465735,121.660181649315 38.9069822281651,121.660503822206 38.9069534976833,121.660743010725 38.9069238146094,121.661088921032 38.906777850908,121.661180767943 38.9067344494449,121.661269884838 38.9066718858909,121.661269884838 38.9066718858909,121.661953339017 38.9061920682425,121.662460906803 38.9058244649225,121.662806366485 38.9056061485967,121.663104651938 38.9054762002529,121.663293866875 38.9054097618638,121.663293866875 38.9054097618638,121.663975166853 38.9051705357459,121.66458160667 38.904990763296,121.664937100526 38.904843682602,121.665073935135 38.9047353344437,121.665073935135 38.9047353344437,121.665548480629 38.9048190780455,121.666433750339 38.9048610224477,121.668448373473 38.9049635902666,121.66921145857 38.9050041203293,121.669506451102 38.9050233974132,121.669669517953 38.9050172973533,121.669761307993 38.9050103851484,121.670252956822 38.9048608065134,121.670816695959 38.904668278167,121.671226955787 38.9045137900451,121.671513395385 38.9044454283226,121.671666278496 38.9044392096088,121.672469775094 38.904453888142,121.672469775094 38.904453888142,121.672512509505 38.9042795302233,121.672527043287 38.9040316790878,121.672602665442 38.903699266714,121.672799813559 38.9032326015312,121.673123603213 38.9023565977691,121.673309890152 38.9019401865135,121.673431341098 38.9018098074698,121.673692921829 38.90161126525,121.674235984123 38.9012105296765,121.674289487488 38.9011690550297,121.674289487488 38.9011690550297,121.674708976533 38.9008438736633,121.675044416021 38.900593056537,121.675049258473 38.9005899626798,121.675049258473 38.9005899626798,121.675053126512 38.9005874913773,121.675548202009 38.9001988341843,121.675810691176 38.8999849472206,121.675903788216 38.8998849978275,121.67591227687 38.8996325815896,121.675958850555 38.8983527226444,121.675964581452 38.8982488118653,121.675874795611 38.8981705547415,121.675746229696 38.8981334481117,121.675415558874 38.8981296980096,121.674947893291 38.8981333048722,121.674687733702 38.8980516046798,121.674687733702 38.8980516046798,121.674877664671 38.8980255615313,121.675058020002 38.8977305342877,121.675671456504 38.8968373592395,121.67575324074 38.8967300696922,121.67575324074 38.8967300696922,121.676203599732 38.8976095025375,121.676459913614 38.8981784645146,121.676568460661 38.8984925155163,121.676789604369 38.8995874115709,121.676843764199 38.8997450701355,121.676937039821 38.8998579125165,121.677077714057 38.8999861965189,121.677238149807 38.9000774423283,121.677598682456 38.9001784063145,121.677930334874 38.9002939469883,121.678110256827 38.9003630550885,121.678157103185 38.900408299587,121.678305934728 38.9006111981734,121.67833163976 38.9007679889106,121.678337584214 38.9009618178597,121.678205962599 38.901373934779,121.67808352927 38.9018047864492,121.678059555077 38.9020690742191,121.678095485924 38.9021887188756,121.678234509341 38.9024064112308,121.678328481107 38.9024819985149,121.678546412065 38.9025589884935,121.678915666164 38.9027047613698,121.679815804329 38.9028782794737,121.68118242554 38.9030892787667,121.681648118858 38.9031640544633,121.681648118858 38.9031640544633,121.682045218539 38.9031222840339,121.68265797049 38.9030099046643,121.683435267949 38.9028902008603,121.683859139572 38.9028307439894,121.684387835513 38.9028183485731,121.68472074138 38.9027676933386,121.684790170532 38.9027340647444,121.684790170532 38.9027340647444,121.685602966738 38.9032756268436,121.685708245354 38.9033408131965,121.685748247247 38.9033924645465,121.685763328041 38.9034630358536,121.685779116533 38.9034952142582,121.685750656924 38.9037060987224,121.685729088825 38.903987462311,121.685758778824 38.9041542001815,121.68582004633 38.9043852948402,121.685856156777 38.9046481070758,121.685928326804 38.9047321210692,121.686066836588 38.9047720804647,121.686107547044 38.9047853388011,121.686164871872 38.904785983763,121.686238928952 38.9047676165087,121.686313103898 38.9047428503901,121.686371136078 38.9047051023489,121.686404954133 38.9046478814739,121.686480543537 38.904546329438,121.686597432467 38.9044260414233,121.686787316725 38.9043449750328,121.686861608897 38.9043138097343,121.686911215541 38.9042887669625,121.686927829644 38.9042761534878,121.686946682762 38.9041419624504,121.686957464468 38.9040012805085,121.687050844696 38.9038231263872,121.687142516009 38.9037377550683,121.687200311292 38.9037128042269,121.687405746638 38.9036767126395,121.687601814831 38.9037045168671,121.687863278594 38.9037394557214,121.688181007117 38.903832627355,121.688457319815 38.9039509335719,121.688643787765 38.9040554299747,121.688820125433 38.9042654147318,121.688986451146 38.9045744890663,121.689155954749 38.9047107949255,121.689253167158 38.9047694874082,121.689334706962 38.9047896030405,121.689375653323 38.9047900625987,121.68942525945 38.9047650187508,121.689491361693 38.9047337598614,121.689557934321 38.9046769056329,121.689592808294 38.9045620943618,121.689618904895 38.9044791853117,121.689685712376 38.9044095333506,121.689768545399 38.904359261591,121.689917244786 38.9042905282794,121.689991300448 38.9042721586172,121.690253707982 38.9042559015532,121.690514940183 38.9043036321775,121.690833908567 38.9043296089858,121.691104622867 38.9043070429867,121.691539238868 38.9042799127902,121.692299956343 38.904336434994,121.69261874966 38.9043720051879,121.692733633601 38.9043604910112,121.692848634823 38.9043425778869,121.692922807143 38.9043178075186,121.693029501728 38.9043062013876,121.693168718621 38.9043077594052,121.693267106652 38.9043024602473,121.693423874631 38.9042402128787,121.693681257698 38.9040510878955,121.693789358514 38.9039626950211,121.693840720904 38.9038416667028,121.693842948129 38.9037200887983,121.693732111726 38.9036001893391,121.693453029598 38.9034485328498,121.693078179894 38.9031575133177,121.692547129156 38.902805842306,121.691826362225 38.9024341172679,121.691631919733 38.9023141358075,121.6915933508 38.9022727286791,121.691607397336 38.9022216672966,121.691620974029 38.902196210028,121.691680330772 38.9021763875291,121.691798480453 38.9021674673807,121.692028038436 38.9021597949715,121.692191968148 38.9021565090414,121.692433693879 38.9022001908621,121.692628325238 38.9023099293567,121.692830533972 38.9023639215491,121.692996524518 38.9023726125111,121.693128169427 38.9023467535066,121.69332113996 38.9023147474795,121.693521977025 38.9023306606701,121.693652620376 38.902359454474,121.693817484715 38.9024296293535,121.693956120517 38.9024995106694,121.694077771159 38.9025418695783,121.694260622716 38.9025849126765,121.694765738947 38.9026349743846,121.694842821343 38.902630366304,121.694948097469 38.9026151340588,121.695018381615 38.9025995106983,121.695173947308 38.9025137354656,121.695309017821 38.9024003830684,121.695548463025 38.902321014013,121.69569712916 38.9022296914059,121.69583899661 38.9021273534881,121.695881686787 38.9020895430542,121.696036150298 38.902063919905,121.69610603368 38.9020701697945,121.696196712111 38.9020875910047,121.696315183994 38.9021162616149,121.696427457424 38.9021011061417,121.696617412286 38.9020485304085,121.696975889857 38.9020100929906,121.697222764552 38.9019836760967,121.69743274081 38.9019335101348,121.697635997669 38.9018424291293,121.698679299473 38.9011335300065,121.699033764247 38.9009391149047,121.699200224364 38.9008184499602,121.699261432284 38.9007374522417,121.699354414237 38.9005517918942,121.69943118957 38.9004359619656,121.699536334286 38.9004021273904,121.699745347089 38.9004044547303,121.700200749655 38.9004066071786,121.700395151959 38.9003912679888,121.700485047792 38.9003747656068,121.700732765958 38.9003016766253,121.701039776439 38.9002525836324,121.701294320962 38.9002145748812,121.701532979847 38.9002288971992,121.701815471512 38.9002962145482,121.702105630242 38.9003525286803,121.702533145881 38.9003961964722,121.702959671264 38.9004943358611,121.703335272187 38.9006541758895,121.703483096815 38.9007414350982,121.703602460305 38.9007505436644,121.703652395521 38.9007433145331,121.703672878895 38.9007124081029,121.703693786652 38.9006581560253,121.703705160044 38.9005804477565,121.703679952302 38.9003233140382,121.703702133107 38.900199025018,121.703763582623 38.9001063056716,121.703853512419 38.9000177941166,121.704023404186 38.8998826122712,121.704179276662 38.8996413589572,121.704213652595 38.8995046730614,121.704198615252 38.899454663547,121.704159210903 38.8994293049861,121.704056374843 38.8993845515285,121.703756631437 38.8992067755687,121.703608062554 38.899046252933,121.703052290754 38.8984793521089,121.702843706723 38.8981995354938,121.70273915938 38.8979839771815,121.702621491557 38.8977882169256,121.7022578947 38.8974326656846,121.701876570552 38.8969996336089,121.701733435707 38.8968010963807,121.701577588895 38.8965999246554,121.701541674236 38.8964698899186,121.701549142389 38.8964101412127,121.701575384633 38.8963705451509,121.701634248071 38.8962914239263,121.70177034032 38.8961757663571,121.701810338529 38.8960814773898,121.701818985999 38.8959569240472,121.701809676032 38.8957673533636,121.701743409036 38.8955522196296,121.701620232478 38.8954257050482,121.701310555299 38.8951564948585,121.701210123227 38.8950690037394,121.701168589112 38.8950153884426,121.701081133974 38.8946822071085,121.70099574882 38.8943603743941,121.70099574882 38.8943603743941,121.701126237021 38.8943505108427,121.701318703927 38.8942070624098,121.70157253492 38.893940003475,121.701841737914 38.8937107726876,121.702068393411 38.89361287091,121.702229555844 38.893583280339,121.702486045654 38.8936112354528,121.702566683879 38.8935933023849,121.702784167225 38.8935580604077,121.703132975855 38.8933673686396,121.703596192011 38.893068110405,121.703816883638 38.8928656335273,121.703816883638 38.8928656335273,121.703821050536 38.8928741222205,121.703832909588 38.8928982811544,121.703806092017 38.8930205228357,121.70378616431 38.8931019945398,121.703690541712 38.8932883462677,121.703533178159 38.8934884289278,121.703314640785 38.8936710130551,121.703090609614 38.8938174947856,121.70293551484 38.8938926597816,121.702743445041 38.8939722193256,121.702471452215 38.8940508906216,121.702274107751 38.8940823361644,121.702205781544 38.8941200206099,121.70216204687 38.8941579782981,121.702142379214 38.8942250361979,121.702146909756 38.8943139875863,121.702205941101 38.8944491965077,121.702283329061 38.8945894148354,121.702452412147 38.8947594846803,121.702621146455 38.894948772251,121.702827075412 38.8951216535964,121.702911224933 38.8952283083774,121.702922122907 38.895305316794,121.702926436013 38.8954062793806,121.702865511561 38.8957131522171,121.702861928912 38.8959101363155,121.702891183718 38.8959921540743,121.702921312374 38.8960261269246,121.702970234761 38.8960410866499,121.703031802787 38.8960369649491,121.703081162045 38.8960279021764,121.70318040469 38.8959809496239,121.703330744678 38.8958293225345,121.703554414793 38.89570999772,121.703644987124 38.8956917702865,121.704014080407 38.8956958667176,121.704309355089 38.8956991430227,121.704415516326 38.8957259645724,121.704419192805 38.8957269677875,121.704419192805 38.8957269677875,121.704632732608 38.8955324011685,121.705028533955 38.8951772026755,121.705255504997 38.8950229757082,121.705387269911 38.8949137939716,121.705449094688 38.8947577358137,121.705454448827 38.8944627485956,121.705507488603 38.8941406293084,121.705677315795 38.893884345795,121.706072935427 38.8935383617711,121.706373098145 38.8932512504134,121.706610685772 38.8931616797612,121.706728643652 38.8931629860371,121.70690424352 38.8932386920926,121.707126358656 38.8933517936608,121.707357597322 38.8936125191229,121.707462423706 38.8936874409843,121.707530359248 38.893844936368,121.707538814297 38.8940294340947,121.707489291853 38.8941579689397,121.707440270398 38.8942588486828,121.707273455991 38.8943492044034,121.707083216267 38.8944300803437,121.706950786321 38.8945761374877,121.70679259704 38.8950068974219,121.706656803272 38.8951782132182,121.706477624117 38.8953029631134,121.706121144689 38.8954487911601,121.705423758073 38.8956945313662,121.705066438014 38.8958864320385,121.704789806498 38.8960380514385,121.704789806498 38.8960380514385,121.704795077556 38.8960571329815,121.704810201373 38.8961278211294,121.704748476181 38.8962281577132,121.704522415578 38.8965246903172,121.704293939795 38.8968364184097,121.704151894893 38.8971767092528,121.704114819645 38.8974226118743,121.704133853007 38.897571460836,121.704261709579 38.8977130236601,121.704326139473 38.8977562064295,121.7044019763 38.8977697881596,121.704461975614 38.8977577133912,121.704527871129 38.8977202232382,121.704594067397 38.8976661719461,121.704896100148 38.8974032371367,121.705234168378 38.8971520323039,121.705401916279 38.8970972356445,121.7055106464 38.8970984408973,121.705698495144 38.8971345167149,121.705994611834 38.897197287254,121.706326921157 38.8972632907845,121.706528754494 38.8973278483395,121.706708636633 38.8974034937225,121.706802253562 38.8974385241986,121.706896589545 38.89743390314,121.70695509277 38.8974062227434,121.707051174535 38.8973053051475,121.70722138584 38.8971145579704,121.707484545593 38.8969956596751,121.708242511436 38.8967774206291,121.708605867113 38.8967304484098,121.708881315698 38.8967334939383,121.709032614475 38.8967861572137,121.709089783448 38.8968321142202,121.709131532407 38.8969288914569,121.709164443631 38.8971133883078,121.709168616508 38.8972834034207,121.709159624824 38.8973796197939,121.709129604659 38.897435944302,121.709063135746 38.8975031971704,121.708989520517 38.8975647053676,121.708850461408 38.8976368212676,121.708396884724 38.8978612638468,121.70759999477 38.898226379458,121.707086982184 38.8985294779435,121.706926172809 38.8986013507178,121.706772714676 38.8986676390425,121.706627121512 38.8987000204849,121.706540135423 38.8986990570893,121.706286631541 38.8986849178317,121.70608428074 38.898648682268,121.705924806394 38.8986469152538,121.705836792422 38.8987025962448,121.705785536543 38.8987303563821,121.705763276001 38.8987584378355,121.705754896312 38.8988206668977,121.705715156599 38.8990128578916,121.705690942544 38.8991485646411,121.705615626247 38.8993035346978,121.70557866201 38.8993427843993,121.705576914063 38.8994390807225,121.705604984349 38.8994903825121,121.705640714863 38.8995191066801,121.705776799492 38.8996112649524,121.706035499764 38.8997387754952,121.706214873514 38.8998427441558,121.706542263516 38.9001806428186,121.706585141004 38.9002151114855,121.706621129128 38.9002296741351,121.706807240349 38.9003620446522,121.706921786478 38.9004426318286,121.706913818432 38.9004822030042,121.706818142972 38.900560462392,121.706813431647 38.9005609754864,121.706813431647 38.9005609754864,121.706723700108 38.900570747805,121.70654350181 38.9005120958205,121.70629806265 38.9004527208471,121.705871295832 38.9003970017412,121.705719169412 38.9003896502205,121.705558765765 38.9004388630385,121.705397693449 38.9005248948047,121.705367566102 38.90058688273,121.705366332002 38.9006548565852,121.705387256389 38.9007004135723,121.705581026824 38.9008102084244,121.705804822198 38.900863679421,121.706058128117 38.9008891488292,121.706311845302 38.9008919597316,121.70657893044 38.9009572400516,121.706680006473 38.9009810219898,121.706766173497 38.9010273012539,121.706851107927 38.9011415543454,121.706928279925 38.9012840495658,121.70694082647 38.9013918354214,121.706932190631 38.9014682257795,121.706908183367 38.9015926037701,121.70694952107 38.9017120396689,121.707013838971 38.9017637424544,121.707085406123 38.9018155254631,121.707150135034 38.9018445702134,121.707251212522 38.9018683516782,121.707403239623 38.9018813657482,121.707555472129 38.901883050638,121.70767084283 38.9019183211814,121.707756908977 38.9019702642292,121.707842051398 38.902073187644,121.707884006816 38.9021586362815,121.707896554926 38.9022664220459,121.707842987569 38.9024216341061,121.707826436064 38.9025347635155,121.707881658414 38.9026883464743,121.707953021834 38.9027514579529,121.708010502692 38.9027804220368,121.708053895615 38.902786567729,121.708097391179 38.9027870489133,121.708162942409 38.9027707771831,121.708250344005 38.9027490814848,121.708351525773 38.9027671975289,121.708451784154 38.9028362939205,121.708471890303 38.9029271663237,121.708485362831 38.9029839715953,121.708499245786 38.9030181188946,121.708585416454 38.9030643968622,121.708628809605 38.9030705423443,121.708679862406 38.9030541099991,121.708709064735 38.9030431016507,121.708782378255 38.9029985872673,121.708884688804 38.9029543934293,121.709051627367 38.9029449077137,121.70910196211 38.9029681266381,121.709130138828 38.9030137631228,121.709157392636 38.9031103800471,121.709125831642 38.9032516718667,121.709160437397 38.903342704427,121.709200730206 38.9033872237133,121.709248265871 38.903433100075,121.709325499498 38.9034415121918,121.709403827438 38.9033894684201,121.709452457487 38.9033748888622,121.709617143045 38.9033615917171,121.709674350266 38.9034075747742,121.709663174616 38.9034905946989,121.709632246002 38.9035960718354,121.709621343797 38.903663977792,121.70963019455 38.9037094265369,121.709648853423 38.9037474251644,121.709686991778 38.9037780805302,121.709764362589 38.9037789353831,121.709890363636 38.9037652104485,121.709968828264 38.9037056093185,121.710085841384 38.9036539924266,121.710183238269 38.9036172757428,121.71025080089 38.9036255804336,121.710269870164 38.9036409080216,121.710795508185 38.9039944026627,121.711293707924 38.9042606695054,121.711379658081 38.9043220858995,121.711446128931 38.9043908457873,121.711472958102 38.9045120776831,121.711459462567 38.9047235665295,121.711414903679 38.9050480899668,121.711368636995 38.90546707565,121.711362490476 38.9058071398712,121.711327260519 38.9061506623781,121.711293874289 38.9063921655996,121.711291278868 38.9065357482462,121.711298628383 38.9066643236603,121.711315649684 38.9067930058038,121.711379254235 38.9070204623398,121.711388920891 38.9071216105251,121.711489724138 38.907249583085,121.711581277761 38.9074727348778,121.711581277761 38.9074727348778,121.710974946936 38.9077657935986,121.710174228129 38.9078849407527,121.709405517796 38.9079324425945,121.708698946714 38.9079406300949,121.708103666759 38.908022038134,121.707618371523 38.9082486474886,121.707213801212 38.9085401427621,121.706748101284 38.9088149610599,121.705191963306 38.9092573019749,121.705191963306 38.9092573019749,121.704874908674 38.908587471494,121.704672876416 38.9082060272739,121.704387035434 38.9077999526658,121.704127695784 38.9076048399926,121.703877604866 38.9074572298231,121.703600940937 38.9072882572666,121.703416616704 38.9072309103418,121.70291755976 38.9070594667038,121.702368009004 38.9068848265036,121.701536900886 38.9066254193183,121.700937148987 38.906431780705,121.70046025776 38.9062777001855,121.700205306508 38.9062158897866,121.699979156047 38.9062007353305,121.699739146601 38.9062064878823,121.699498599362 38.9062417204119,121.69924946741 38.9063042371057,121.698856572825 38.9064676427219,121.698856572825 38.9064676427219,121.699225849345 38.9068600043901,121.699320219696 38.9070063816545,121.699426215748 38.9071065524608,121.699881122733 38.9075855074961,121.70009542952 38.9078069355145,121.700502371208 38.9082558677296,121.700676639275 38.9084557873619,121.700788613919 38.9086718630894,121.700923195168 38.9089787557281,121.701146735523 38.9095815022042,121.701473415158 38.9103285927429,121.701473415158 38.9103285927429,121.698780137029 38.9112062212136,121.697860396115 38.9115929989078,121.697860396115 38.9115929989078,121.695977886809 38.912384612481,121.695653775184 38.9124758254166,121.695447622754 38.9124297055749,121.694992730363 38.9122456063929,121.693492541415 38.9117339036408,121.693268980359 38.9116752401277,121.693017310602 38.9116794438039,121.69287247307 38.9116931397455,121.69287247307 38.9116931397455,121.692486247719 38.9117296605866,121.691262994625 38.9117966900313,121.690633367877 38.9118317531644,121.690290700675 38.9118981127655,121.690145001645 38.9119396164161,121.690145001645 38.9119396164161,121.690101012626 38.9119521470296,121.689992177054 38.9120070880598,121.689865245014 38.9120688461968,121.689638331266 38.9121926644799,121.689432776929 38.9122949632964,121.689021621145 38.9125148674406,121.68867118051 38.9126886770793,121.688321082428 38.9128437795483,121.687694605156 38.9130519050833,121.687537695861 38.9130762494546)";
+		var line = OpenLayers.Geometry.fromWKT(lineStr);
+		var feature = new OpenLayers.Feature.Vector(line);
+		ljfxLayer.addFeatures([feature]);
+		//mapObj_event.zoomToExtent(feature.geometry.getBounds(),true); 
+		findCameraData(feature);
+		var obj = {};
+		obj['hphm']= hphm;
+		obj['feature']=feature;
+		var falg = false;
+		for (var i=0;i<ljfxFeatures.length;i++) {
+			if(ljfxFeatures[i]['hphm']==hphm){
+				ljfxFeatures[i]['feature']=feature;
+				falg = true;
+			}
+		}
+		if(falg==false){
+			ljfxFeatures.push(obj);
+		}
+		*/
+		var url = "http://10.80.8.204:8090/JCDL/NetAnalysis/PathAnalysis.ashx?stops="+event_x+","+event_y+";"+group_x+","+group_y+"&&barriers=";
+			console.log(url);
+			var postData={
+				"event":"TRANS",
+				"extend":{"eventswitch":"search"},
+				"content":{"condition":{"url":url}}
+			};
+			//console.log(url);
+			var Loader = new AJAXObj();
+			$(Loader).bind("JSON_LOADED",function(e,backJson){
+				var value = backJson['value'];
+				var status = $(value).find("Status").text();
+				if(status!="Success"){
+					return;
+				}
+				var path = $(value).find("points");					
+				var wkt = "LINESTRING(";
+				var lineStr = "";
+				for (var i=0;i<path.length;i++) {
+					var point = $(path[i]).find("Point");
+					var pointStr = "";
+					for(var j=0;j<point.length;j++){
+						var x = $(point[j]).find("x").text();
+						var y = $(point[j]).find("y").text();
+						//console.log("x:",x,";y:",y);
+						if(j!=0){
+							pointStr +=",";
+						}
+						pointStr += x+" "+y;
+					}
+					if(i!=0){
+						lineStr +=",";
+					}
+					lineStr += pointStr;
+				}
+
+				wkt += lineStr + ")";
+				var obj = {};
+				var line = OpenLayers.Geometry.fromWKT(wkt);
+				var feature = new OpenLayers.Feature.Vector(line);
+				obj['hphm']= hphm;
+				obj['feature']=feature;
+				ljfxLayer.addFeatures([feature]);
+				if(mode){
+					findCameraData(feature);
+				}
+				var falg = false;
+				for (var i=0;i<ljfxFeatures.length;i++) {
+					if(ljfxFeatures[i]['hphm']==hphm){
+						ljfxFeatures[i]['feature']=feature;
+						falg = true;
+					}
+				}
+				if(falg==false){
+					ljfxFeatures.push(obj);
+				}
+			});
+			$(Loader).bind("SYS_ERROR",function(e,msg){
+				$.error("调用失败!");
+			});
+			Loader.POSTDATA("php/trans.php",postData);
+			
+	}
+	
+	function findCameraData(Linefeature){
+		var loadLjfxCamera=function(){
+			var cameraFeatures = mainWindow.cameraFeatures;
+			var radius = 39.3701/4374754*100;
+			var lxfxFeatures = new Array();
+			for(var i=0;i<cameraFeatures.length;i++){
+				var camersFeature = cameraFeatures[i];
+				var minter =camersFeature.geometry.distanceTo(Linefeature.geometry);
+				if(minter<radius){
+					lxfxFeatures.push(cameraFeatures[i]);
+				}
+			}
+			cameralayer.removeAllFeatures();
+			cameralayer.addFeatures(lxfxFeatures); 
+			cameralayer.setVisibility(true);
+		}
+		var cameraFeatures = mainWindow.cameraFeatures;
+		if(cameraFeatures.length>0){
+			loadLjfxCamera();
+		}else{
+			$(document).one("loadLjfxCamera",loadLjfxCamera);
+			var cameralayer_mapObj = mainWindow.mapObj.getLayersByName("摄像头")[0];
+			cameralayer_mapObj.setVisibility(true);
+			cameralayer_mapObj.setVisibility(false);
+		}
+	}
+	
+}
+--></script>
+<!--内容部分start-->
+<div id="layout">布局容器</div>
+
+<!--附件内容-->
+<div class="detailBox">
+   <form id="Detail">
+  <div class="zediewindow">
+<div  data-option="{'title':'警情基本信息','open':true}" id="part_1">
+       <!-- 警情基本信息 -->
+     <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+	  <tr>
+	    <th width="20%" align="right"><i>警情编号</i></th>
+	    <td width="27%"><span id="jqbh"></span></td>
+	     <th width="20%" align="right"><i>报警类别</i></th>
+	    <td width="33%"><span id="jqlxdm"></span></td>
+	  </tr>
+	   <tr>
+	    <th align="right"><i>报警电话</i></th>
+	    <td><span id="bjdh"></span></td>
+	     <th align="right"><i>报警时间</i></th>
+	    <td><span id="bjsj"></span></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>警情摘要</i></th>
+	    <td colspan="3"><span id="bjnr"></span></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>警情地址</i></th>
+	    <td colspan="3"><span id="jqdd"></span></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>警情详址</i></th>
+	    <td colspan="3"><span id="jqdz"></span></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>下派部门</i></th>
+	    <td colspan="3"><span id="stationhouse"></span></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>派发部门</i></th>
+	    <td colspan="3"> <input  type="text" name="bmdm" id="bmdm"  style="width:300px" class="fm_popOutSelect" data-option="{'url':'pages/treeSelector.html','width':500,'height':400,'mulit':false}" /></td>
+	  </tr>
+	</table>
+    </div>
+	 <div  data-option="{'title':'警情相关信息','open':false}" id="part_6">
+	 <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+	  <tr>
+        <th align="right"><i>警情状况</i></th>
+        <td colspan="3"><label><input  type="checkbox" name="jqzk" value="1"/>八大类案件</label><label><input  type="checkbox" name="jqzk" value="2"/>正在发生</label>
+        <label><input  type="checkbox" name="jqzk" value="3"/>有人员伤亡,造成重大损失</label>
+        </td>
+      </tr>
+      <tr>
+        <th align="right"><i>重大警情</i></th>
+        <td colspan="3"><label><input  type="checkbox" name="jqzk" value="4"/><font id="ldgz">领导关注</font></label>
+        </td>
+      </tr>
+	  <tr>
+	    <th align="right"><i>案件级别</i></th>
+	    <td><select  style="width:100px" name="jqdjdm" id="jqdjdm">
+            <option value="一般" selected="selected">一般</option>
+            <option value="严重">严重</option>
+            <option value="重大">重大</option>
+          </select></td>
+        <th align="right"><i>警情状态</i></th>
+	    <td><span id="jqclzt"></span></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>接警类型</i></th>
+	    <td><span id="jjlx"></span></td>
+	    <th align="right"><i>报警类型</i></th>
+	    <td><span id="bjfs"></span></td> 
+	  </tr>
+	  <tr>
+	    <th align="right"><i>警情类别</i></th>
+	    <td><span id="jqlbdm"></span></td>
+	    <th align="right"><i>接警方式</i></th>
+	    <td><span id="jjfs"></span></td>
+	  </tr>
+	</table>
+	 </div>
+     <div  data-option="{'title':'报警信息','open':false}" id="part_2">
+     <div id="bjxx">
+        <div class="splittitle">报警人信息</div>
+       <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab">
+         <tr>
+             <th width="15%" align="right"><i>报警人</i></th>
+               <td width="35%"><span id="bjrxm"></span></td>
+               <th width="15%" align="right"><i>性别</i></th>
+               <td width="35%"><span id="bjrxbdm"></span></td>
+            </tr>
+            <tr>
+               <th align="right"><i>报警电话</i></th>
+               <td><span id="bjdh"></span></td>
+               <th align="right"><i>联系电话</i></th>
+               <td><span id="lxdh"></span></td>
+          	</tr>
+          	<tr>
+               <th align="right"><i>电话地址</i></th>
+               <td  colspan="3"><span id="bjdhyhdz"></span></td>
+         	</tr>
+          </table>
+        <div class="splittitle">接警信息</div>
+          <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+			<tr>
+               <th width="15%" align="right"><i>席位号</i></th>
+               <td width="35%"><span id="jjrbh"></span></td>
+               <th width="15%" align="right"><i>管辖单位</i></th>
+               <td width="35%"><span id="orgname"></span></td>
+            </tr>
+            <tr>
+               <th align="right"><i>接警时间</i></th>
+               <td colspan="3"><span id="jjsj"></span></td>
+            </tr>
+          </table>
+        </div> 
+     </div>
+    <div data-option="{'title':'处警信息','open':false}"  id="part_3">
+   <!-- 处警单0 必须有-->
+      <div class="block" id="chujingdan_0">
+        <div class="blocktitle"><em>处警单编号：</em><span id="cjdbh">123456</span></div>
+          <p> <em>派警时间：</em><span id="pjsj">2015-02-32 12:23:34 </span><em>处警单状态：</em><span id="cjdzt">完成</span></p>
+        <div class="blockPart" id="zhiling_0">
+          <h1><em>指令编号：</em><span id="zlbh">987654</span></h1>
+          <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+             <tr>
+              <th align="right"><i>指令标识</i></th>
+              <td><span id="zlbs"/></td>
+            </tr>
+             <tr>
+              <th width="80" align="right"><i>人员编号</i></th>
+              <td><span id="rybh"/></td>
+            </tr>
+            <tr>
+              <th align="right"><i>姓名</i></th>
+              <td><span id="xm"/></td>
+            </tr>
+            <tr  class="zyzlDeleteSj">
+              <th align="right"><i>处警领导</i></th>
+              <td><span id="cjld"/></td>
+            </tr>
+            <tr class="zyzlDeleteSj">
+              <th align="right"><i>下达时间</i></th>
+              <td><span id="zlxdsj"/></td>
+            </tr>
+            <tr class="zyzlDeleteSj">
+              <th align="right"><i>接收时间</i></th>
+              <td><span id="zljssj"/></td>
+            </tr>
+            <tr class="zyzlDeleteSj">
+              <th align="right"><i>到达现场时间</i></th>
+              <td><span id="ddxcsj"/></td>
+            </tr>
+            <tr class="zyzlDeleteSj">
+              <th align="right"><i>处理完毕时间</i></th>
+              <td><span id="clwbsj"/></td>
+            </tr>
+             <!-- 
+             <tr>
+              <th align="right"><i>处理结果代码</i></th>
+              <td><span id="cljgdm"/></td>
+            </tr>
+             <tr>
+              <th align="right"><i>出动车辆情况</i></th>
+              <td><span id="cdclqk"/></td>
+            </tr>
+             <tr>
+              <th align="right"><i>出动人员情况</i></th>
+              <td><span id="cdryqk"/></td>
+            </tr>
+             <tr>
+              <th align="right"><i>警情状态代码</i></th>
+              <td><span id="jqztdm"/></td>
+            </tr>
+            -->
+            <tr>
+              <th align="right"  class="zlnrDeleteSj"><i>指令信息</i></th>
+              <td><span id="zlnr"/></td>
+            </tr>
+             <tr>
+              <th align="right"><i>处理结果</i></th>
+              <td><span id="cljg"/></td>
+            </tr>
+			<tr>
+              <th align="right"><i>处警人</i></th>
+              <td><span id="cjr"/></td>
+            </tr>
+			<tr>
+              <th align="right"><i>出动警力</i></th>
+              <td><span id="cdjl"/></td>
+            </tr>
+           <tr>
+              <th align="right"><i>机动车次</i></th>
+              <td><span id="jidongcheci">1</span></td>
+            </tr>
+          </table>
+        </div>
+        <div class="blockPart">
+          <h1><em>指令编号：</em>987654</h1>
+          <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+            <tr>
+              <th width="80" align="right"><i>姓名</i></th>
+              <td><span id="name"/></td>
+            </tr>
+            <tr>
+              <th align="right"><i>证件类型</i></th>
+              <td><span id="cardtype"/></td>
+            </tr>
+            <tr>
+              <th align="right"><i>身份证</i></th>
+              <td><span id="idno"/></td>
+            </tr>
+            <tr>
+              <th align="right"><em>录入人</em></th>
+              <td><span id="user"/></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+      
+      <!-- 处警单1-->
+      <div class="block">
+        <div class="blocktitle"><em>处警单号：</em>123456
+        </div>
+        <p> <em>派警时间：</em>2015-02-32 12:23:34 <em>状态：</em>完成</p>
+        <div class="blockPart">
+          <h1><em>指令编号：</em>987654</h1>
+          <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+            <tr>
+              <th width="80" align="right"><i>姓名</i></th>
+              <td><span id="name"/></td>
+            </tr>
+            <tr>
+              <th align="right"><i>证件类型</i></th>
+              <td><span id="cardtype"/></td>
+            </tr>
+            <tr>
+              <th align="right"><i>身份证</i></th>
+              <td><span id="idno"/></td>
+            </tr>
+            <tr>
+              <th align="right"><em>录入人</em></th>
+              <td><span id="user"/></td>
+            </tr>
+          </table>
+        </div>
+        <div class="blockPart">
+          <h1><em>指令编号：</em>987654</h1>
+          <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+            <tr>
+              <th width="80" align="right"><i>姓名</i></th>
+              <td><span id="name"/></td>
+            </tr>
+            <tr>
+              <th align="right"><i>证件类型</i></th>
+              <td><span id="cardtype"/></td>
+            </tr>
+            <tr>
+              <th align="right"><i>身份证</i></th>
+              <td><span id="idno"/></td>
+            </tr>
+            <tr>
+              <th align="right"><em>录入人</em></th>
+              <td><span id="user"/></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div data-option="{'title':'反馈信息','open':false}"  id="part_4">
+    <form id="Fankui">
+      <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+        <tr>
+	    <th align="right"><i>反馈图片</i></th>
+	    <td colspan="3"><div class="fm_uploadPicsShow uppicbox" data-option="{'rel':'xyzd','editable':false}"></div>
+          <input  type="hidden" name="xyzd" id="imgTd"  /></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>反馈语音</i></th>
+	    <td colspan="3" id="imgYx"> <input  type="text" name="imgAudio" class="fm_voicePlay" /></td>
+	  </tr>     
+      <tr>
+      	<th align="right"><i>&nbsp;</i></th>
+        <td colspan="3">
+        <label><input type="checkbox" name="belong" value="1" class="fm_noAutoPost"/>属于街面</label>
+        <label><input type="checkbox" name="scene" value="1"  class="fm_noAutoPost"/>已立/拟立</label>        
+        </td>
+      </tr>
+      </table>
+      
+	   <div class="splittitle">案件反馈信息</div>
+       <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+      <tr>
+        <th width="20%" align="right"><i>反馈单编号</i></th>
+		<td><span id="fkdbh"></span></td>
+        <th width="20%" align="right"><i>反馈员编号</i></th>
+		<td><span id="fkybh"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>反馈人姓名</i></th>
+		<td><span id="fkyxm"></span></td>
+        <th align="right"><i>抓获人数</i></th>
+		<td><span id="zhrs"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>涉案人数</i></th>
+		<td><span id="sars"></span></td>
+        <th align="right"><i>救助人数</i></th>
+		<td><span id="jzrs"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>救助人说明</i></th>
+		<td colspan="3"><span id="jzrssm"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>解救人数</i></th>
+		<td><span id="jjrs"></span></td>
+        <th align="right"><i>逃跑人数</i></th>
+		<td><span id="tprs"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>解救人说明</i></th>
+		<td colspan="3"><span id="jjrssm"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>解救妇女人数</i></th>
+		<td><span id="jjfvrs"></span></td>
+        <th align="right"><i>解救儿童人数</i></th>
+		<td><span id="jjetrs"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>受伤人数</i></th>
+		<td><span id="ssrs_fk"></span></td>
+        <th align="right"><i>死亡人数</i></th>
+		<td><span id="swrs_fk"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>受伤人数说明</i></th>
+		<td colspan="3"><span id="ssrssm"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>死亡人数说明</i></th>
+		<td colspan="3"><span id="swrssm"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>待救援人数</i></th>
+		<td><span id="djyrs"></span></td>
+        <th align="right"><i>出警人员受伤人数</i></th>
+		<td><span id="cjryssrs"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>出警人员死亡人数</i></th>
+		<td><span id="cjryswrs"></span></td>
+        <th align="right"><i>留置审查人数</i></th>
+		<td><span id="lzscrs"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>经济损失</i></th>
+		<td colspan="3"><span id="jjssqk"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>挽回经济损失</i></th>
+		<td colspan="3"><span id="whjjssqk"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>是否破获刑事案件</i></th>
+		<td><span id="sfphxsaj"></span></td>
+        <!--<td><input  type="radio" name="sfphxsaj" value="1"/>是&nbsp;<input  type="radio" name="sfphxsaj" value="2"/>否</td>-->
+        <th align="right"><i>是否查处治安案件</i></th>
+		<td><span id="sfcczaaj"></span></td>
+        <!--<td><input  type="radio" name="sfcczaaj" value="1"/>是&nbsp;<input  type="radio" name="sfcczaaj" value="2"/>否</td>-->
+      </tr>
+      <tr>
+        <th align="right"><i>是否解决纠纷</i></th>
+		<td colspan="3"><span id="sfjjjf"></span></td>
+        <!--<td colspan="3"><input  type="radio" name="sfjjjf" value="1"/>是&nbsp;<input  type="radio" name="sfjjjf" value="2"/>否</td>-->
+      </tr>
+      <tr>
+        <th align="right"><i>警情处理结果</i></th>
+		<td colspan="3"><span id="jqcljg"></span></td>
+        <!--<td colspan="3"><input  type="text" name="jqcljg"  style="width:96%" /></td>-->
+      </tr>
+      </table>
+       <div class="splittitle">消防反馈信息</div>
+      <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+      <tr>
+        <th width="20%" align="right"><i>火灾等级代码</i></th>
+		<td><span id="hzdjdm_fk"></span></td>
+        <th width="20%" align="right"><i>天气情况代码</i></th>
+		<td><span id="tqqkdm"></span></td>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>火灾原因代码</i></th>
+		<td><span id="hzyydm"></span></td>
+        <th width="20%" align="right"><i>灾害事故类型代码</i></th>
+		<td><span id="zhsglxdm"></span></td>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>起火物代码</i></th>
+		<td><span id="qhwdm_fk"></span></td>
+        <th width="20%" align="right"><i>起火建筑结构代码</i></th>
+		<td><span id="qhjzjgdm_fk"></span></td>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>火灾场所代码</i></th>
+		<td><span id="hzcsdm_fk"></span></td>
+        <th width="20%" align="right"><i>现场总指挥</i></th>
+		<td><span id="xczzh"></span></td>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>第一出动时间</i></th>
+		<td><span id="dycdsj"></span></td>
+        <!--<td width="30%"><input style="width:200px"  class="fm_dateinput"  value=""  data-option="{'data':'y,m,d,h,t,s','force2':true}"  name="dycdsj" type="text" /></td>-->
+        <th width="20%" align="right"><i>第一到场时间</i></th>
+		<td><span id="dydcsj"></span></td>
+        <!--<td width="30%"><input style="width:200px"  class="fm_dateinput"  value=""  data-option="{'data':'y,m,d,h,t,s','force2':true}"  name="dydcsj" type="text" /></td>-->
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>火场扑灭时间</i></th>
+		<td><span id="hcpmsj"></span></td>
+        <!--<td width="30%"><input style="width:200px"  class="fm_dateinput"  value=""  data-option="{'data':'y,m,d,h,t,s','force2':true}"  name="hcpmsj" type="text" /></td>-->
+        <th width="20%" align="right"><i>撤离时间</i></th>
+		<td><span id="clsj"></span></td>
+        <!--<td width="30%"><input style="width:200px"  class="fm_dateinput"  value=""  data-option="{'data':'y,m,d,h,t,s','force2':true}"  name="clsj" type="text" /></td>-->
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>出动水枪数</i></th>
+		<td><span id="cdsqs"></span></td>
+        <th width="20%" align="right"><i>下落不明人数</i></th>
+		<td><span id="xlbmrs"></span></td>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>是否重点单位</i></th>
+		<td><span id="sfzddw"></span></td>
+        <!--<td width="30%"><input  type="radio" name="sfzddw" value="1"/>是&nbsp;<input  type="radio" name="sfzddw" value="2"/>否</td>-->
+        <th width="20%" align="right"><i>重点单位名称</i></th>
+		<td><span id="zddwbm"></span></td>
+        <!--<td width="30%"><input  type="text" name="zddwbm"  style="width:200px" /></td>-->
+      </tr>
+      </table>
+       <div class="splittitle">交通反馈信息</div>
+      <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+      <tr>
+        <th width="20%" align="right"><i>交通事故形态代码</i></th>
+		<td><span id="jtsgxtdm"></span></td>
+        <th width="20%" align="right"><i>是否装载危险品</i></th>
+		<td><span id="sfwhp"></span></td>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>交通事故初查原因代码</i></th>
+		<td><span id="sgccyydm"></span></td>
+        <th width="20%" align="right"><i>能见度代码</i></th>
+		<td><span id="njddm"></span></td>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>路面状况代码</i></th>
+		<td><span id="lmzkdm"></span></td>
+        <th width="20%" align="right"><i>损坏机动车数</i></th>
+		<td><span id="shjdcs"></span></td>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>损坏非机动车数</i></th>
+		<td><span id="shfjdcs"></span></td>
+        <th width="20%" align="right"><i>道路类型代码</i></th>
+		<td><span id="dllxdm"></span></td>
+      </tr>
+      </table>
+      </form>
+     
+    </div>
+      <div data-option="{'title':'警情辅助信息','open':false}"  id="part_5">
+      <div id="fjxx">
+        <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+          <tr>
+            <th width="20%" align="right"><i>有无爆炸</i></th>
+            <td width="30%"><span id="ywbzxl"></span></td>
+             <th width="20%" align="right"><i>号牌种类</i></th>
+            <td width="30%"><span id="bjchpzldm"></span></td>
+          </tr>
+          <tr>
+            <th align="right"><i>报警车牌号</i></th>
+            <td><span id="bjcph"></span></td>
+            <th align="right"><i>被困人数</i></th>
+            <td><span id="bkrs"></span></td>
+          </tr>
+          <!--tr>
+            <th align="right"><i>受伤人数</i></th>
+            <td><span id="ssrs"></span></td>
+            <th align="right"><i>死亡人数</i></th>
+            <td><span id="swrs"></span></td>
+          </tr-->
+          <tr>
+            <th align="right"><i>是否涉外</i></th>
+            <td><span id="sfsw"></span></td>
+            <th align="right"><i>外语报警</i></th>
+            <td><span id="sfswybj"></span></td>
+          </tr>
+          <tr>
+            <th align="right"><i>警情状态</i></th>
+            <td><span id="jqztdm"></span></td>
+            <th align="right"><i>作案工具</i></th>
+            <td><span id="zagjdm"></span></td>
+          </tr>
+          <tr>
+            <th align="right"><i>警情等码</i></th>
+            <td><span id="jqztdm"></span></td>
+            <th align="right"><i>火灾等级</i></th>
+            <td><span id="hzdjdm"></span></td>
+          </tr>
+          <tr>
+            <th align="right"><i>起火建筑结构</i></th>
+            <td><span id="qhjzjgdm"></span></td>
+            <th align="right"><i>火灾场所</i></th>
+            <td><span id="hzcsdm"></span></td>
+          </tr>
+          <tr>
+            <th align="right"><i>毗邻情况</i></th>
+            <td><span id="plqk"></span></td>
+            <th align="right"><i>起火物</i></th>
+            <td><span id="qhwdm"></span></td>
+          </tr>
+          <tr>
+            <th align="right"><i>有无逃逸</i></th>
+            <td><span id="ywty"></span></td>
+            <th align="right"><i>危化车辆</i></th>
+            <td><span id="sfswhcl"></span></td>
+          </tr>
+        </table>
+       </div> 
+    </div>
+  </div>
+  </form>
+</div>
+
+<!--tab标签-->
+ <div class="fm_tabBox"  data-option="{'position':'left','width':120,'default':0}"> 
+<a data-option="{'type':'1'}">移动警务</a><a  data-option="{'type':'2'}">警务工作站</a><a  data-option="{'type':'3'}">卡口</a> 
+ </div>
+ <!--表格-->
+<div class="datalist" id="tabcont">
+  <div id="datalist"> </div>
+</div>
+<!--内容部分end--> 

@@ -1,0 +1,67 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	var Tree;
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		var H=p.WRAPER.height()-p.find(".submitButs").outerHeight(true); 
+		p.find(".selectWraper").setRealSize(null,H);
+		H=p.find(".selectWraper").height();
+		p.find(".selectTreeBox").setRealSize(null,H);
+		p.find(".selectedBox").setRealSize(null,H);	
+	}	
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+		
+		//更新一下尺寸
+		p.resize();
+		
+		//安装树选择
+		var treeOptions={
+		  "url":"php/system/GetOrgTreeForMR.php",
+		  queryParams:{"event":"FormEdit","content":JSON.stringify({"condition":{"orgCode":userData.orgCode}}),"extend":{}}, //附加参数对象		  
+		  "onlyLeafCheck":false, //只选叶子
+		  "cascadeCheck":false, //级联检查
+		  "method":"post",
+		  "loadFilter":formatHostJson
+		}									  
+		Tree=new TreeSelector(p.find(".selectTreeBox"),treeOptions,p.find(".selectedBox"),p.WINDOW.option["mulit"],p.CONDITION);
+		
+		//绑定确定按钮
+		p.find("#confirmButton").bind("click",function(){				
+			//获得选中的数据
+			var values=Tree.getSelected();
+			//返回赋值
+			WINDOW.callback(p.WINID,values);					
+			WINDOW.	close(p.WINID);//关闭窗口
+		})
+		//绑定取消按钮
+		p.find("#cancelButton").one("click",function(){
+			WINDOW.	close(p.WINID);//关闭窗口
+		})
+	}	
+}
+</script>
+<!--内容部分start-->
+<!--树选择容器-->
+<div class="selectWraper" style="position:relative;width:100%">
+  <div class="selectTreeBox" style="position:absolute;left:0px;top:0px;width:280px;overflow-y:auto">正在加载数据...</div>
+  <div class="selectedBox"  style="position:absolute;left:290px;top:0px;right:0px;overflow-y:auto">请在左侧选择...</div>
+</div>
+<!--提交按钮-->
+<div class="submitButs">
+  <a  id="confirmButton"  class="but-normal but-red"> <i class="fa fa-check"></i> 确定</a>
+  <a  id="cancelButton" class="but-normal but-greenlight"> <i class="fa fa-reply"></i> 取消</a>
+</div>
+<!--内容部分end--> 
+

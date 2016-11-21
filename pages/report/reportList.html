@@ -1,0 +1,50 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION.READY方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		p.find(".treeWraper").height(p.WRAPER.height()-p.find(".pageTopBox").outerHeight(true));	
+	}
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+
+//		//更新一下尺寸
+		p.resize();
+		//安装树EasyUI
+		p.find("#menutree").tree({"url":"host/Statisticalreport_tree.php","method":"get","loadFilter":formatHostJson,"animate":true,"onlyLeafCheck":true,"onClick":treeMenuClick});
+	}
+	
+	function treeMenuClick(node){	
+            if(p.find("#menutree").tree('isLeaf',node.target)){
+                WINDOW.open({"name":"datagrid_"+node.id,"width":0.8,"height":0.8,"url":"pages/report/showReport.html","title":node.text},node);
+             }
+		
+		//var option={"name":"treewindow","width":600,"height":400,"url":node["url"],"title":node["text"]};
+		//sWINDOW.open(option,{"guid":"weww"},node.target);//打开新窗口
+	}
+}
+
+
+</script>
+
+<!--内容部分start-->
+<div class="pageTopBox">
+<h1 class="pagetitle"><i class="fa fa-th-large"></i> 统计报表</h1>
+  </div>
+<div class="treeWraper">  
+  <div id="menutree" ></div>
+</div>
+
+<!--内容部分end-->
+

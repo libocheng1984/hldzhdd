@@ -1,0 +1,221 @@
+<meta charset="utf-8">
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	var chirdName = p.WINID+'_dataGrid';
+	//窗口缩放尺寸设置
+	this.resize=function(){
+		p.find(".datalist").height(p.WRAPER.height()-p.find(".pageTopBox").outerHeight(true));		//option["height"]	
+		p.find("#tt").datagrid("resize"); 
+	}
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+		$(document).unbind("addEventData",bindEventData);
+		//WINDOW.getActionById("MapTools").hide();	
+	}
+	
+	this.READY=function(){
+		//WINDOW.getActionById("MapTools").show();
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",function(e,option){ 
+			p.resize();
+		})
+		
+		//表格例子------------------------------------------
+		var clumoption=[[
+			{field:'ck',checkbox:true},
+			{field:'jqclzt',title:'状态',width:"10%",fixed:true,align:"center",formatter:function(value,record,index){
+					var result = util.getJqclzt(value);
+					if(record.jqdjdm == "重大"){
+						result = '<span style="color:#ef0000;font-weight:bold;">'+result+'</span>';
+					}else if(record.jqdjdm == "严重"){
+						result = '<span style="color:#ff7200;font-weight:bold;">'+result+'</span>';
+					}
+					return result;
+	               	
+              }},
+			{field:'jqlxdm',title:'类型',width:"15%",align:"center",formatter:function(value,record,index){
+	               var result = util.getAjlx(value);
+	               	if(record.jqdjdm == "重大"){
+						result = '<span style="color:#ef0000;font-weight:bold;">'+result+'</span>';
+					}else if(record.jqdjdm == "严重"){
+						result = '<span style="color:#ff7200;font-weight:bold;">'+result+'</span>';
+					}
+					return result;
+              }},
+			{field:'bjnr',title:'内容',width:"25%",formatter:function(value,record,index){
+					var result = value;
+					if(record.jqdjdm == "重大"){
+						result = '<span style="color:#ef0000;font-weight:bold;">'+result+'</span>';
+					}else if(record.jqdjdm == "严重"){
+						result = '<span style="color:#ff7200;font-weight:bold;">'+result+'</span>';
+					}
+					return result;
+	               	
+              }},
+			{field:'jqdd',title:'地址',width:"25%",formatter:function(value,record,index){
+					var result = value;
+					if(value.length>10){
+						result = "..."+value.substr(5);
+					}
+					if(record.jqdjdm == "重大"){
+						result = '<span style="color:#ef0000;font-weight:bold;">'+result+'</span>';
+					}else if(record.jqdjdm == "严重"){
+						result = '<span style="color:#ff7200;font-weight:bold;">'+result+'</span>';
+					}
+	               	return result;
+              }},
+			{field:'bjdh',title:'电话',width:"18%",align:"center",formatter:function(value,record,index){
+					var result = value;
+					if(record.jqdjdm == "重大"){
+						result = '<span style="color:#ef0000;font-weight:bold;">'+result+'</span>';
+					}else if(record.jqdjdm == "严重"){
+						result = '<span style="color:#ff7200;font-weight:bold;">'+result+'</span>';
+					}
+					return result;
+	               	
+              }},
+			]];
+		p.find("#tt").datagrid({
+			fit:true,
+			showFooter:true,//显示总计??
+			rownumbers:true,//行号
+			singleSelect:true,
+			fitColumns:true,//宽度自适应
+			striped:true,//条纹
+			pagination:true,//分页
+			columns:clumoption,
+			//渲染行样式
+			onDblClickRow:onDblClickRow,
+			onRowContextMenu:rightClickShowMsg,
+			onClickRow:onClickRow,
+			loadFilter:pagerFilter
+		})
+		//渲染单元格
+		formatter(mainWindow.eventStore);
+		$(document).unbind("addEventData",bindEventData);
+		$(document).bind("addEventData",bindEventData)
+		
+		//更新一下尺寸
+		p.resize();
+		
+	}
+	
+	function bindEventData(){
+		if(p.find("#tt").length==0){
+			$(document).unbind("addEventData",bindEventData);
+			return;
+		}
+		var store = mainWindow.eventStore;
+		addEventData(store);
+	}
+		
+	function formatter(arr){
+		var store = arr;
+		try{
+			p.find("#tt").datagrid("loadData",store)
+		}catch(e){
+			$(document).unbind("addEventData",bindEventData);
+		}
+	}
+	
+	function addEventData(obj){
+		formatter(obj);
+	}
+	
+	function onDblClickRow(rowIndex, rowData){
+		WINDOW.close(chirdName);
+		var tr = $.getDatagridTr(p.find("#tt"),rowIndex); 
+		//if(rowData['jqclzt']=="1"){
+			WINDOW.open({"name":chirdName,"width":800,"height":400,"url":"pages/zhdd/eventViewLBC.html","title":"警情详细",'position':'left_bottom'},{"record":rowData},tr);
+		//}else{
+		//	WINDOW.open({"name":chirdName,"width":600,"height":400,"url":"pages/zhdd/eventProcessDetail.html","title":"警情详细",'position':'left_bottom'},{"record":rowData},tr);
+		//}
+	}
+	
+	function onClickRow(rowIndex, rowData){
+		var mapObj = mainWindow.mapObj;
+		var jqclzt = rowData['jqclzt'];
+		var point = null;
+		if(jqclzt=="2"||jqclzt=="3"){
+			var mhzb = rowData['mhjqzb'];
+			point = OpenLayers.Geometry.fromWKT(mhzb);
+		}else if(jqclzt=="4"){
+			var jqzb = rowData['jqjqzb'];
+			point = OpenLayers.Geometry.fromWKT(jqzb);
+		}
+		if(mapObj&&point){
+			point = new OpenLayers.LonLat(point.x, point.y); 
+			mapObj.setCenter(point);
+		}
+	}
+	
+	function rightClickShowMsg(e,rowIndex,row){
+		e.preventDefault();
+		var jqclzt= row['jqclzt'];
+		var tr = $.getDatagridTr(p.find("#tt"),rowIndex); 
+		if(jqclzt!="1"){
+			var pos=[e.clientX,e.clientY]; 
+			var msg=$("<p><a id='bczlBtn' class='but-small but-red'>补充指令</a></p><p> <a id='cxpjBtn' class='but-small but-green'>重新派警</a></p>");
+			$.tips(pos,"right",msg);
+			msg.find("#bczlBtn").one("click",function(){
+				WINDOW.close(chirdName);
+				var params = {"value":"","text":""};
+				WINDOW.open({"name":chirdName,"width":500,"height":400,"mulit":false,"url":"pages/zhdd/commandTreeSelector.html","title":"补充指令",'position':'left_center'},{"record":row,"values":params},tr);
+				$.closetips();//关闭tip消息
+			})
+			msg.find("#cxpjBtn").one("click",function(){
+				WINDOW.close(chirdName);
+				WINDOW.open({"name":chirdName,"width":800,"height":400,"url":"pages/zhdd/eventView.html","title":"警情详细",'position':'left_bottom'},{"record":row},tr);		
+				$.closetips();//关闭tip消息
+			})	
+		}
+	}
+	
+	function pagerFilter(data){
+			if (typeof data.length == 'number' && typeof data.splice == 'function'){	// is array
+				data = {
+					total: data.length,
+					rows: data
+				}
+			}
+			var dg = $(this);
+			var opts = dg.datagrid('options');
+			var pager = dg.datagrid('getPager');
+			pager.pagination({
+				onSelectPage:function(pageNum, pageSize){
+					opts.pageNumber = pageNum;
+					opts.pageSize = pageSize;
+					pager.pagination('refresh',{
+						pageNumber:pageNum,
+						pageSize:pageSize
+					});
+					dg.datagrid('loadData',data);
+				}
+			});
+			if (!data.originalRows){
+				data.originalRows = (data.rows);
+			}
+			var start = (opts.pageNumber-1)*parseInt(opts.pageSize);
+			var end = start + parseInt(opts.pageSize);
+			data.rows = (data.originalRows.slice(start, end));
+			return data;
+	}
+	
+	
+}
+</script>
+<!--内容部分start-->
+<!--表格-->
+<div class="datalist">
+  <div id="tt"> </div>
+</div>
+
+
+<!--内容部分end-->
+

@@ -1,0 +1,73 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="ie=8;ie=9;ie=EDGE">
+<title></title>
+</head>
+
+<script type="text/javascript" src="JsLib/OpenLayers/OpenLayers.js"></script>
+<script type="text/javascript" src="js/lib/LayerControl.js"></script>
+<script type="text/javascript" src="js/lib/MySelectFeature.js"></script>
+<script src="js/lib/OlMap.js"></script>
+<script src="js/lib/wz_jsgraphics.js"></script>
+<script src="js/main.js"></script> 
+<script src="js/pages/OutResource.js"></script> 
+<script src="js/pages/MapUtil.js"></script> 
+<script src="js/pages/MapControl.js"></script> 
+<script src="js/pages/Util.js"></script>
+<script src="js/Common.js"></script>
+<script src="js/pages/MapTool.js"></script>
+<script src="config/config.js"></script>
+
+
+
+<script>
+
+function InstallMap(){
+	mainWindow = new MainWindow();
+	mainWindow.getUserRole();
+	util = new Util();
+	util.getOrganization();
+	util.getOrganizationAll();
+}
+//$(function(){
+
+
+	
+	//安装背景地图	
+	//var point= new BMap.Point(121.619205,38.916041); 
+	//var map = new BMap.Map("Mapcontainer");
+	//map.centerAndZoom(point, 15);		
+//})
+</script>
+<body>
+<div class="fm_outerPage"  data-option="{'name':'PageTop','url':'pages/top.html'}" style="position:fixed;top:0px;left:0px;width:100%"></div>
+<!--主菜单-->
+<div class="fm_outerPage"  data-option="{'name':'MainMenu','url':'pages/mainmenu_top.html'}"></div>
+<!--页面容器 三联滑动-->
+<div class="pagerContainer">
+  <div class="pagebox">
+    <div class="contentContainer"></div>
+  </div>
+  <div class="pagebox  mapcontainer">
+    <div class="contentContainer" style="padding: 0px">
+      <div class="relpos maptoolbox"> 
+        <!--地图按钮-->
+        <div class="maptools fm_outerPage" data-option="{'name':'MapTools','url':'pages/maptools.html'}"></div>
+        <!--地图图标-->
+        <div class="mapinfo fm_outerPage" data-option="{'name':'MapIcon','url':'pages/mapicon.html'}"></div>
+      </div>
+      <div id="Mapcontainer" class="mapbox"></div>
+    </div>
+  </div>
+  <div class="pagebox">
+    <div class="contentContainer"></div>
+  </div>
+</div>
+<!--底部-->
+<div class="footBar noselect"></div>
+<!--用户面板-->
+<div class="userinfPanel fullHeight noselect fm_outerPage" data-option="{'name':'UserInfo','url':'pages/userinfo.html'}" style="z-index:705"></div>
+</body>
+</html>

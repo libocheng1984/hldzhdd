@@ -1,0 +1,115 @@
+<script type="text/javascript">
+function ACTION(){
+	var p=this;	
+	var LINSHI;
+	var SubmitForm;
+	var detailAccBox;
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		p.find(".detailBox,.zediewindow").height(p.WRAPER.height()-p.find(".submitButs").outerHeight(true))
+	}		
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){  
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);	
+		//返回按钮事件
+		p.find("#cancelButton").bind("click",function(){ 
+			WINDOW.close(p.WINID);//关闭窗口
+		});		
+		//表单例子------------------------------------------
+		LINSHI=new paibanActionPoint(p.find(".fm_datePointSelector"));		
+		//表单格式化处理
+		SubmitForm=new  formDeal(p.find("#Detail"));// detailDeal(p.find("#Detail"));
+		$(SubmitForm).one("HTML_FORMATED",getFormData);//绑定格式化完成事件，执行下一步
+		SubmitForm.parse();	
+		//创建折叠对象
+		detailAccBox=new AccordionFrame(p.find(".zediewindow"));	
+		//更新一下尺寸
+		p.resize();	
+	}	
+	
+	function checkTimePart(startime,endtime){   
+		if(startime && endtime){
+			startime=startime.split(":");
+			endtime=endtime.split(":");
+			var today=new Date();			
+			startime=new Date(today.getFullYear(),today.getMonth(),today.getDate(),parseInt(startime[0]),parseInt(startime[1]));
+			endtime=new Date(today.getFullYear(),today.getMonth(),today.getDate(),parseInt(endtime[0]),parseInt(endtime[1]));			
+			if(endtime<=startime){
+				endtime.setDate(endtime.getDate()+1);
+			}
+			var timeDiff=Math.round(100*(endtime.getTime()-startime.getTime())/(60*60*1000))/100;   
+			p.find("#timePart").text(timeDiff);
+		}		
+	}
+	
+	//获取数据
+	function getFormData(){
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){			
+			SubmitForm.bindData(backJson["value"]);//绑定数据	
+			//排班规则
+			var paibanVal=backJson["value"]["PAIBANGUIZHE"];
+			LINSHI.updateAllDate(paibanVal);
+			//临时排班
+			var LinshiPaibanVal=backJson["value"]["LINSHIPAIBAN"]; 
+			LINSHI.setDefultValue(LinshiPaibanVal);		
+			
+			checkTimePart(backJson["value"]["KAISHISHIJIAN"],backJson["value"]["JIESHUSHIJIAN"]);						
+		})
+		Loader.POSTDATA("php/mrzb/getZbzAndMaxZbsj.php",{"event":"GET_PAIBAN","content":{"condition":p.CONDITION},"extend":{}});				
+	}
+	
+}
+</script>
+<!--内容部分start-->
+<!--表单-->
+<div class="detailBox">
+  <form id="Detail">
+    <div class="zediewindow">
+      <div  data-option="{'title':'班组信息','open':true}" id="part_1">
+        <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+          <tr>
+            <th width="100" align="right"><i>班组名称</i></th>
+            <td><span id="BANZHUMINGCHENG"></span></td>
+          </tr>
+          <tr>
+            <th align="right"><i>班组值班长</i></th>
+            <td><span id="BANZHUZHANG_text"  ></span></td>
+          </tr>
+          <tr>
+            <th align="right"><i>班组成员</i></th>
+            <td><span id="BANZHUCHENGYUAN_text" ></span></td>
+          </tr>
+        </table>
+      </div>
+      <div  data-option="{'title':'工作时间','open':true}" id="part_2">
+        <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+          <tr>
+            <th width="100" align="right"><i>开始时间</i></th>
+            <td><span id="KAISHISHIJIAN" ></span></td>
+          </tr>
+          <tr>
+            <th align="right"><i>结束时间</i></th>
+            <td><span id="JIESHUSHIJIAN" ></span></td>
+          </tr>
+          <tr>
+            <th align="right"><i>工作时长</i></th>
+            <td><strong id="timePart" class="red"></strong> 小时</td>
+          </tr>
+        </table>
+      </div>
+      <div data-option="{'title':'班组排班','open':true}"  id="part_3">
+        <div class="fm_datePointSelector disSelected" data-option="{'afterMonth':2,'beforeMonth':1,'editable':false}"> </div>
+      </div>
+    </div>
+  </form>
+</div>
+<!--提交按钮-->
+<div class="submitButs"><a  id="cancelButton" class="but-normal but-yellow"> <i class="fa fa-reply"></i> 返回</a></div>
+<!--内容部分end--> 

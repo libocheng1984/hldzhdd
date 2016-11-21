@@ -1,0 +1,176 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+var p=this;	  
+var mapObj = null;
+var rwAnalysisLayer = null;
+var rwdLayer = null;
+
+var record = [];
+
+
+var policeLayer = null;
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		p.find("#mapDiv").height(p.WRAPER.height());
+	}
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+		if(mapObj){
+			mapObj.destroy();
+			mapObj=null;
+		}
+	}
+	
+	
+	this.READY=function(){
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",function(e,option){ 
+			p.resize();
+		})
+		record = p.CONDITION['rowData'];
+		
+		//更新一下尺寸
+		p.resize();		
+		mapInit();
+
+		addLineGeometry();
+		addMarkerGeometry();
+	}
+	
+	function mapInit(){
+		var mapId = p.WINID+Math.floor(Math.random()*10000);
+		p.find("#rwShowMap").attr("id",mapId)
+		var olMap = new OlMap();
+		mapObj = olMap.mapInitialize(mapId,"",7);
+
+		var trackStyles = new OpenLayers.StyleMap({
+            "default": new OpenLayers.Style({
+                strokeColor: "#1FC21F",
+				strokeOpacity: 0.8,
+				strokeWidth: 6,
+				strokeLinecap: "round",
+				strokeDashstyle: "solid",
+				hoverStrokeColor: "red",
+				hoverStrokeOpacity: 1,
+				hoverStrokeWidth: 0.2,
+				cursor: "inherit"
+            })
+       	});
+            
+           var rwdListeners = {
+    	           'featureselected':function(evt){
+    	               var feature = evt.feature;
+    	               var obj = feature.obj;
+    	               var innerHtml = "<div style='font-size:.9em'>点位信息";
+    	               for(var i=0;i<obj.length;i++){
+    	               		if(i==0){	
+    	               		innerHtml =  innerHtml+"<br>——————————————————<br>点位名称："+obj[i].kdmc+"<br>巡逻时间："+obj[i].kdsj+"<br>应打次数："+obj[i].ydcs+"<br>间隔时间（秒）："+obj[i].jgsj;
+    	               		}else{
+    	               		innerHtml =  innerHtml+"<br>——————————————————<br>巡逻时间："+obj[i].kdsj+"<br>应打次数："+obj[i].ydcs+"<br>间隔时间（秒）："+obj[i].jgsj;
+    	               		}
+    	               }
+    	               innerHtml = innerHtml+"</div>";
+    	               var popup = new OpenLayers.Popup.FramedCloud("popup",
+    	                   OpenLayers.LonLat.fromString(feature.geometry.toShortString()),
+    	                   null,
+    	                   innerHtml,
+    	                   null,
+    	                   false
+    	               );
+    	               feature.popup = popup;
+    	               mapObj.addPopup(popup);
+    	           },
+    	           'featureunselected':function(evt){
+    	               var feature = evt.feature;
+    	               mapObj.removePopup(feature.popup);
+    	               feature.popup.destroy();
+    	               feature.popup = null;
+    	           }
+    	       }
+            
+            rwAnalysisLayer = new OpenLayers.Layer.Vector("rwAnalysis",{styleMap: trackStyles,displayInLayerSwitcher:false});
+            rwdLayer = new OpenLayers.Layer.Vector("point",{displayInLayerSwitcher:false});
+   	     	rwdLayer.events.on(rwdListeners);
+			mapObj.addLayers([rwAnalysisLayer,rwdLayer]);
+			
+			var selector = new OpenLayers.Control.MySelectFeature([rwdLayer],{
+				autoActivate:true,
+				hover: true,
+				highlightOnly:true
+			});
+			mapObj.addControl(selector);
+			
+	}
+
+	function addLineGeometry(){
+		debugger;
+		if(record['geometry']){
+			rwAnalysisLayer.removeAllFeatures();
+			var line = OpenLayers.Geometry.fromWKT(record['geometry']);
+			var feature = new OpenLayers.Feature.Vector(line);
+			rwAnalysisLayer.addFeatures([feature]);
+			mapObj.zoomToExtent(feature.geometry.getBounds(),true);
+		}
+	}
+
+	function addMarkerGeometry(){
+		if(record['dianwei']){
+			 for(var i=0;i<record['dianwei'].length;i++){						  
+				 addFeature(record['dianwei'][i]);
+			}	
+		}
+	}
+
+	function addFeature(rowData){
+		if(!rwdLayer){
+			return;
+		}
+		var obj = [];
+		var features = rwdLayer.getFeatureById(rowData.kdid);
+		if(!features){
+			var img = "images/zhdd/rwd.png";
+			var point = OpenLayers.Geometry.fromWKT(rowData.geometry);
+			
+			var ft = new OpenLayers.Feature.Vector();
+			ft.geometry = point;
+			ft.id = rowData.kdid;
+			ft.style = {
+				cursor: "pointer",
+				label: rowData.kdmc,
+				fontWeight: "bold",
+				fontColor:"#ffffff",
+				labelOutlineWidth: 3,
+				labelOutlineColor: "#4089be",
+				labelYOffset:-26,
+				labelXOffset:0,
+				graphicWidth:24,   
+				graphicHeight : 24,   
+				graphicXOffset : -12,   
+				graphicYOffset : -12, 
+				externalGraphic : img
+			};
+			obj.push(rowData);
+			ft.info = rowData;
+			ft.obj = obj;
+			rwdLayer.addFeatures(ft);
+		}else{
+			features.obj.push(rowData);
+		}
+		var point = OpenLayers.Geometry.fromWKT(rowData['geometry']);
+		point = new OpenLayers.LonLat(point.x, point.y); 
+	}
+	
+	
+	
+}
+</script>
+</div>
+<div id="mapDiv" style="width:100%;">
+		<div id="rwShowMap" class="mapbox" style="background-color:#CCC;width: 100%;height: 100%;"></div>
+</div>
+

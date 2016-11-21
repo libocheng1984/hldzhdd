@@ -1,0 +1,223 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行READY方法，代替document.ready执行
+//重要：写在ACTION外的方法是全局方法，尽量不要这么干，以免方法冲突。
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//重要：页面关闭的时候会尝试执行DESTROY方法，请在这里解除事件绑定，销毁对象，以免窗体残留。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+//重要：保证标签完整闭合，否则IE8报错 “ACTION_Window_1426578029038953”未定义
+function ACTION(){
+	var p=this;	
+	var processRecord = null;
+	var feedBackRecord = null;
+    var guid="";
+	var record = {};
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){ 
+		p.find(".datalist").height(p.WRAPER.height()-p.find(".pageTopBox").outerHeight(true)); 
+		p.find("#tt").datagrid("resize"); 
+	}
+	
+ 
+	var SearchForm;
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){
+		processRecord = p.CONDITION['record'];
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+		
+		
+		SubmitForm=new formDeal(p.find("#Form"));
+                p.find("#saveButton").bind("click",SaveForm);	
+                p.find("#cancelButton").bind("click",function(){ 
+			WINDOW.	close(p.WINID);//关闭窗口
+		});
+		$(SubmitForm).one("HTML_FORMATED",getFormData);//绑定格式化完成事件，执行下一步
+		SubmitForm.parse();
+		//更新一下尺寸
+		p.resize();
+        guid=getguid();        
+        p.find("[name=jqid]").val(guid);
+                //改变下拉选项
+        debugger;   
+		//alert(p.find("[name=jqlxdm]").length);
+		
+	}
+	
+	//编辑状态，获取数据
+	function getFormData()
+	{
+		p.find("[name=jqlxdm]").change(function(){
+                        var Loader=new AJAXObj();
+                        $(Loader).bind("JSON_LOADED",function(e,backJson){			
+                                SubmitForm.bindData();//绑定数据		
+                                p.find("#jqlbdm").changeOption(backJson["value"]);		
+                        })
+                        Loader.POSTDATA("php/event/getdic.php",{"p_code":$(this).val()});				
+                        
+				
+			
+				
+		});
+	}
+	 function getguid() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random()*16|0, v = c == 'x' ? r : (r&0x3|0x8);
+        return v.toString(16);
+        }).replace(/\-/g,"");
+    }
+	function SaveForm(){
+		if(SubmitForm.check()){ //数据校验
+			//保存失败
+			var errorBack=function(e){				
+				p.find("#saveButton").removeClass("disable");//解按钮
+			}	
+			//保存成功
+			var saveResult=function(e,BackJson){
+				$.message("保存成功！",2000);
+				//var parentWindow=WINDOW.getActionById(p.CONDITION["parentid"]);//通过窗体ID找到窗体对象（ACTION）
+				//parentWindow.refesh(); //执行父窗体方法
+				WINDOW.	close(p.WINID);//关闭窗口
+			}
+			//获取表单数据
+			formData=SubmitForm.getData();
+                        var time1 = new Date().format("yyyy-MM-dd hh:mm:ss");
+                        formData.jjsj=time1;
+                        formData.stationhouseCode=userData.orgCode;
+                        formData.stationhouse=userData.orgName;
+						formData.cjdbh=formData.jqid;
+                        formData.bmbh=userData.orgCode.substring(0,6)+"000000";
+			p.find("#saveButton").addClass("disable");//锁按钮			
+			var postData={"event":"saveForm",
+									"extend":{"eventswitch":"save"},
+									"content":{"condition":formData}
+									};
+                        postData.content.condition.id=p.CONDITION["id"];
+			var Loader=new AJAXObj();
+			$(Loader).unbind().one("JSON_LOADED",saveResult).one("SYS_ERROR",errorBack);			
+			Loader.POSTDATA("php/event/insertevent.php",postData);
+		}
+	}
+
+      
+}
+
+Date.prototype.format = function(fmt)   
+{ //author: meizz   
+  var o = {   
+    "M+" : this.getMonth()+1,                 //月份   
+    "d+" : this.getDate(),                    //日   
+    "h+" : this.getHours(),                   //小时   
+    "m+" : this.getMinutes(),                 //分   
+    "s+" : this.getSeconds(),                 //秒   
+    "q+" : Math.floor((this.getMonth()+3)/3), //季度   
+    "S"  : this.getMilliseconds()             //毫秒   
+  };   
+  if(/(y+)/.test(fmt))
+    fmt=fmt.replace(RegExp.$1, (this.getFullYear()+"").substr(4 - RegExp.$1.length));   
+  for(var k in o)   
+    if(new RegExp("("+ k +")").test(fmt))   
+  fmt = fmt.replace(RegExp.$1, (RegExp.$1.length==1) ? (o[k]) : (("00"+ o[k]).substr((""+ o[k]).length)));   
+  return fmt;   
+}  
+
+
+
+</script>
+
+<!--内容部分start-->
+<!--表格-->
+<div class="formBox">
+  <form id="Form">
+    <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+	  <!--  -->
+<tr>
+        <th width="20%" align="right"><i>警情编号</i></th>
+        <td width="80%"><input name="jqbh" maxlength="32" type="text"  style="width:200px" class="must"/></td>
+      </tr>
+      <tr>
+        <th align="right"><i>报警时间</i></th>
+        <td><input name="bjsj" type="text"  class="fm_dateinput must" id="bjsj" style="width:200px" data-option="{'data':'y,m,d,h,t,s'}"/></td>
+      </tr>
+      <tr>
+        <th align="right"><i>警情地点</i></th>
+        <td><input name="jqdd" maxlength="60" class="must" type="text" style="width:200px" /></td>
+      </tr>
+      <tr>
+        <th align="right"><i>报警内容</i></th>
+        <td><input name="bjnr" maxlength="600" class="must" type="text" style="width:200px" /></td>
+      </tr>
+      <tr>
+        <th align="right"><i>警情类型</i></th>
+        <td><select  name="jqlxdm" id="jqlxdm" style="width:200px" data-option="{'url':'php/event/getdic.php','param':{'p_code':''}}" class="must"/></td>
+      </tr>
+      <tr>
+        <th align="right"><i>警情类别</i></th>
+        <td><select  style="width:200px" name="jqlbdm" id="jqlbdm" >
+            <option value="">请选择</option>
+           
+          </select></td>
+      </tr>
+      
+      <tr>
+        <th align="right"><i>警情等级</i></th>
+        <td><select  style="width:100px" name="jqdjdm" id="jqdjdm">
+            <option value="一般" selected="selected">一般</option>
+            <option value="严重">严重</option>
+            <option value="重大">重大</option>
+          </select></td>
+      </tr>
+      <tr>
+        <th align="right"><i>报警人姓名</i></th>
+        <td><input name="bjrxm" maxlength="4" class="must" type="text" style="width:200px" /></td>
+      </tr>
+      <tr>
+        <th align="right"><i>报警人身份号码</i></th>
+        <td><input name="bjrsfzh" maxlength="18" class="check_id"  type="text" style="width:200px" /></td>
+      </tr>
+      <tr>
+        <th align="right"><i>报警人性别</i></th>
+        <td>
+        <select  style="width:100px" name="bjrxbdm" id="jqdjdm">
+            <option value="1">男</option>
+            <option value="2">女</option>
+            
+          </select>
+        
+        </td>
+      </tr>
+      <tr>
+        <th align="right"><i>报警电话</i></th>
+        <td><input name="bjdh" maxlength="20"  type="text" style="width:200px" /></td>
+      </tr>
+      <tr>
+        <th align="right"><i>联系电话</i></th>
+        <td><input name="lxdh" maxlength="20"  type="text" style="width:200px" /></td>
+      </tr>
+      <tr>
+        <th align="right"><i>报警电话用户姓名</i></th>
+        <td><input name="bjdhyhxm" maxlength="10"  type="text" style="width:200px" /></td>
+      </tr>
+      <tr>
+        <th align="right"><i>报警电话用户地址</i></th>
+        <td><input name="bjdhyhdz" maxlength="60"  type="text" style="width:200px" /></td>
+      </tr>
+      <tr>
+        <th align="right"><i>接警人编号</i></th>
+        <td><input name="jjrbh" maxlength="4" class="check_uint must"  type="text" style="width:200px" /></td>
+      </tr>
+      
+	  <!-- end -->
+  </table>
+      <input type="hidden" name="jjsj"/>
+      <input type="hidden" name="jqid"/>
+  </form>
+</div>
+<!--内容部分end--> 
+<div class="submitButs"><a  id="saveButton" class="but-normal but-red"> <i class="fa fa-save"></i> 保存</a><a  id="cancelButton" class="but-normal but-greenlight"> <i class="fa fa-reply"></i> 关闭</a></div>
+
+

@@ -1,0 +1,242 @@
+<?php
+/**********************************************************************
+ *
+ * $Id: GlobalConfig.class.php,v 1.0 2014/6/3 9:31 carl Exp $
+ *
+ * 全局变量
+ * 
+ **********************************************************************/
+class GlobalConfig {
+	public $dsdm='2114';//地市代码4位
+	//public $db_tnsname = '192.168.20.134/orcl';
+	public $db_tnsname = '(DEscriptION=(ADDRESS=(PROTOCOL = TCP)(HOST=192.168.20.134)(PORT = 1521))(CONNECT_DATA =(SID=orcl)))';
+	public $db_userid = 'hld_zd';
+	public $db_password = 'hld_zd';
+	
+	public $pg_host ="192.168.1.14";
+	public $pg_port="5432";
+	public $pg_dbname="postgis_21_sample";
+	public $pg_user="postgres";
+	public $pg_password="136136136";
+
+	public $out_url = "http://192.168.20.216:9999/lbs";
+	public $interfaceUrl = "http://192.168.20.216:9999/bns";
+	public $license = "a756244eb0236bdc26061cb6b6bdb481";
+	
+	public $memcache_ip = '192.168.20.178';
+	//public $memcache_ip = '192.168.0.210';
+	public $memcache_port = 11211;
+	
+	public $use_memcache = false;
+	
+	public $socket_ip = "192.168.20.178";
+	
+	public $socket_port = 40003;
+	public $alarm_distance='100';
+
+	public $upload_src = '../uploads/';
+  	public $message_src='\\\\192.168.20.178\\tpmsSocket\\message\\';  
+	public $test_src='E:/message/';
+  	public $uptypes=array(  
+	    'image/jpg',  
+	    'image/jpeg',  
+	    'image/png',  
+	    'image/bmp',  
+	    'image/x-png',
+	    'application/octet-stream' 
+	);
+	public $imgType = array('jpg','jpeg','png','gif','bmp');
+	public $audioType = array('mp3');
+	//public $videoType = array('mp4','flv','f4v');
+	public $videoType = array('mp4');
+	public $outType = array('exe','com','dll','php','jsp','asp');
+	public $max_file_size=8000000;//上传文件大小限制, 单位BYTE  
+	public $imgpreview=1;      //是否生成预览图(1为生成,其他为不生成);   
+	
+	
+	public $menuData=array('{"id":"1","title":"接处警","iconclass":"icon0"}',
+			'{"id":"2","name":"window_001","width":670,"height":270,"url":"pages/zhdd/zhdd.html","title":"指挥调度","position":"left_top","toggle":true}',
+			'{"id":"3","name":"window_002","width":750,"height":270,"url":"pages/zhdd/overEvent.html","title":"结束警情","position":"left_top"}',
+			'{"id":"4","title":"勤务管理","iconclass":"icon1"}',
+			'{"id":"5","name":"window_003","width":600,"height":270,"url":"pages/equip/policeGroup.html","title":"巡逻组查询","position":"left_bottom"}',
+			'{"id":"6","name":"window_004","width":600,"height":270,"url":"pages/equip/xltzbcx.html","title":"巡逻特征查询","position":"left_bottom"}',
+			'{"id":"7","name":"window_005","width":600,"height":270,"url":"pages/equip/xkzhcx.html","title":"巡逻绑定","position":"left_bottom"}',
+			'{"id":"8","name":"window_009","width":1200,"height":470,"url":"pages/zhdd/zbbd.html","title":"装备绑定","side":"right"}',
+			'{"id":"9","title":"合成作战","iconclass":"icon2"}',
+			'{"id":"10","name":"window_006","width":460,"height":600,"url":"pages/zhdd/zhddIM.html","title":"合成作战","position":"left_top","toggle":true}',
+			'{"id":"11","title":"预案管理","iconclass":"icon2"}',
+			'{"id":"12","title":"决策分析","iconclass":"icon3"}',
+			'{"id":"13","name":"window_007","width":460,"height":270,"url":"pages/qjfx/IntelligenceList.html","title":"情报分析","position":"right_top","toggle":true}',
+			'{"id":"14","title":"系统维护","iconclass":"icon2"}');
+	
+	/*********************************************************/		
+	static private $_instance=null;
+ 	static function getInstance() {
+  		if(! self::$_instance){
+   			self::$_instance=new self;
+  		}
+		return self::$_instance;
+	}
+	function __construct() {
+	}
+
+}
+
+/**
+ * 基类定义
+ * 操作数据库登录登出
+ */
+class DbBaseClass {
+	function __construct() {
+	}
+
+	private function getOciError($stmt="") {
+		if ($stmt=="") {
+			$e = @oci_error();
+			return GBK2UTF8($e['message']);
+		} else {
+			$e = @oci_error($stmt);
+			return  GBK2UTF8($e['sqltext']).GBK2UTF8($e['message']);
+		}
+	}
+	
+	private function Logon($dbuserid, $dbpasswd, $tnsname) {
+		putenv("NLS_LANG=AMERICAN_AMERICA.ZHS16GBK");   
+		$dbconn = @oci_pconnect($dbuserid, $dbpasswd, $tnsname, 'zhs16gbk') or die("数据库连接失败--".$this->getOciError());
+		return $dbconn;
+	}
+	
+	public function Logoff($dbconn) {
+		if ($dbconn != null)
+			oci_close($dbconn);
+	}
+	
+	public function LogonDB() {
+		$dbname = GlobalConfig::getInstance()->db_tnsname;
+		$dbuserid = GlobalConfig::getInstance()->db_userid;
+		$dbpasswd = GlobalConfig::getInstance()->db_password;
+		
+		return $this->Logon($dbuserid, $dbpasswd, $dbname);
+	}
+	
+	/**
+	 * 返回Oracle错误码
+	 * @param object $obj [optional]
+	 * @return 
+	 */
+	public function OraError($obj=null) {
+		if ($obj != null)
+			$arrerr = OCIError($obj);
+		else
+			$arrerr = OCIError();
+			
+		return $arrerr['message'];
+	}
+
+}
+
+function GBK2UTF8($str) {
+	return iconv('gbk','utf-8', $str);
+}
+
+function UTF82GBK($str) {
+	return iconv('utf-8', 'gbk', $str);
+}
+
+function isDebug() {
+	return false;
+}
+
+/**
+ * encodeJson
+ * json编码 中文不转码
+ */
+function encodeJson($array) {
+	return json_encode($array, JSON_UNESCAPED_UNICODE);
+}
+
+function getIP() {
+	global $ip;
+	if (getenv("HTTP_CLIENT_IP"))
+		$ip = getenv("HTTP_CLIENT_IP");
+	else if(getenv("HTTP_X_FORWARDED_FOR"))
+		$ip = getenv("HTTP_X_FORWARDED_FOR");
+	else if(getenv("REMOTE_ADDR"))
+		$ip = getenv("REMOTE_ADDR");
+	else $ip = "Unknow";
+		return $ip;
+}
+
+/**
+ * paging
+ * 分页
+ */
+function paging($sql, $start=0, $limit=10) {
+	if ($start === FALSE || $start < 0)
+		$start = 0;
+	if ($limit === FALSE || $limit < 1 || $limit > 500001)
+		$limit = 10;
+	$sql = "select tmptab2_.* from (select tmptab1_.*, rownum rnum_ from (" . $sql
+		.") tmptab1_ where rownum<=" . ($start + $limit) . ") tmptab2_ where rnum_>" . ($start) ;
+		
+	return $sql;
+}
+
+/**
+ * pageResultSet
+ * 分页查询
+ * @param $sql, $page, $rows
+ * @return $sql
+ */
+function pageResultSet($sql, $page=1, $rows=10) {
+	if ($page === FALSE || $page < 1)
+		$page = 1;
+	if ($rows === FALSE || $rows < 1 || $rows > 500001)
+		$rows = 10;
+	$sql = "select tmptab2_.* from (select tmptab1_.*, rownum rnum_ from (" . $sql
+		.") tmptab1_ where rownum<=" . ($page * $rows) . ") tmptab2_ where rnum_>" . (($page-1) * $rows) ;
+	return $sql;
+}
+
+
+/**
+ * xssValidation
+ * 防xss攻击检测
+ */
+function xssValidation($param) {	
+	$res = htmlentities($param);//转换html关键字，防xss攻击
+	return $res;
+}
+
+/**
+ * sqlValidation
+ * 防sql注入检测
+ * return 
+ * true:无注入，false：检测到非法注入
+ */
+function sqlInjectValidation($values) {
+	error_reporting(0);
+	$sql_in = array(insert,delete,update,select,alert,truncate,drop,create,where);
+//	foreach($_REQUEST as $key=>$value){	
+//		$values .= $value;
+//	}
+
+	$values = strtolower($values);
+	//echo $values;
+	if(strpos($values,"'") or strpos($values,'"') or  strpos($values,'update') or strpos($values,'delete') or strpos($values,'set') or strpos($values,'alert') or strpos($values,'exec') or strpos($values,'declare')){
+		//echo '1111';
+		return false;
+	}
+
+	$sql_get = explode(" ",$values);
+	foreach($sql_get as $key_get=>$value_get){
+		$value_get = strtolower($value_get);
+		if(in_array($value_get,$sql_in)){
+			return false;
+		}
+	}
+	
+	return true;
+}
+
+?>

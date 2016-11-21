@@ -1,0 +1,294 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var util = new Util();	
+	var p=this;	
+	var record = null;
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		p.WRAPER.css("overflow","hidden")
+		p.find(".detailBox").css("overflow","hidden");//.addClass("beforeresize");
+		p.find(".detailBox,.zediewindow").height(p.WRAPER.height()-p.find(".submitButs").outerHeight(true))
+		p.find(".zediewindow").css("overflow-y","auto");
+		p.find("#tt").datagrid("resize");
+	}
+	
+	//表单对象
+	var Detailobj;
+	
+	this.READY=function(){
+		record = p.CONDITION['record'];
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",function(e,option){ 
+			p.resize();
+		})
+		
+		//反馈信息事件
+		p.find("#cancelButton").bind("click",function(){ 
+			WINDOW.close(p.WINID);
+		});
+		
+		
+		//表单格式化处理
+		Detailobj=new formDeal(p.find(".zediewindow"));
+		$(Detailobj).bind("HTML_FORMATED",getFormData);//绑定格式化完成事件，执行下一步
+		Detailobj.parse();	
+		p.find(".zediewindow"). AccordionFrame();//折叠展开设置	
+		
+		
+		
+		//表格例子------------------------------------------EasyUI组件
+		var clumoption=[[
+			{field:'cjdbh',title:'处警单编号',width:"29%",fixed:true,align:"center"},
+			{field:'pjsj',title:'派警时间',width:"35%",align:"center"},
+			{field:'cjdzt',title:'处警单状态',width:"35%",align:"center",formatter:function(value,record,index){
+					var result = value;
+					if(value=="1"){
+						result = "正常";
+					}else{
+						result = "无效";
+					}
+	               	return result;
+              }}
+			]];
+		p.find("#tt").datagrid({
+			fit:true,
+			showFooter:true,//显示总计??
+			rownumbers:true,//行号
+			singleSelect:true,
+			fitColumns:true,//宽度自适应
+			striped:true,//条纹
+			pagination:false,//分页
+			onDblClickRow:dataGridClick,
+			columns:clumoption
+		})
+		
+		//更新一下尺寸
+		p.resize();	
+	}
+	
+	//获取数据
+	function getFormData(){
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){	
+			record= backJson["value"]['records'];
+			//console.log(JSON.stringify(record));
+			var jqclzt = util.getJqclzt(record.jqclzt);
+			var bjfs = util.getBjfs(record.bjfs);
+			var jjlx = util.getJjlx(record.jjlx);
+			var jjfs = util.getJjfs(record.jjfs);
+			var ajlx = util.getAjlx(record.jqlxdm);
+			var ajlb = util.getAjlb(record.jqlbdm);
+			//var jqdj = util.getJqdj(record.jqdjdm);
+			var xb = util.getSex(record.bjrxbdm);
+			record['jqzk']=JSON.parse("["+record['jqzk']+"]");
+			Detailobj.bindData(record);//绑定数据	
+		
+			p.find("[name=jqzk]").readonly();
+			p.find("#jqclzt").text(jqclzt);
+			p.find("#bjfs").text(bjfs);
+			p.find("#jjlx").text(jjlx);
+			p.find("#jjfs").text(jjfs);
+			p.find("#jqlxdm").text(ajlx);
+			p.find("#jqlbdm").text(ajlb);
+			//p.find("#jqdjdm").text(jqdj);
+			p.find("#bjrxbdm").text(xb);
+			var processRecords = record['processRecords'];
+			
+			p.find("#tt").datagrid("loadData",processRecords);
+			p.find("#feedBackButton").unbind();
+	 		p.find("#feedBackButton").bind("click",onClickFeedBack);
+				
+		})
+		Loader.POSTDATA("php/event/GetEventById_web.php",{"event":"FormEdit","content":{"condition":{"jqid":record['jqid']}},"extend":{}});				
+		
+	}
+	
+	function dataGridClick(rowIndex,rowData){
+		WINDOW.open({"name":rowIndex+'_eventCommand',"width":500,"height":500,"url":"pages/zhdd/eventCommand.html","title":"处警信息","lock":true,'position':'left_center'},{"record":rowData,"winId":p.WINID},p.find("#tt").datagrid("getPanel"));
+	}
+	
+	function onClickFeedBack(){
+		if(record['cjdbh']){
+			WINDOW.open({"name":p.WINID+'_eventFeedBack',"width":800,"height":500,"url":"pages/zhdd/eventFeedBack.html","title":"反馈信息","lock":true,'position':'center_bottom'},{"record":record,"winId":p.WINID},p.find("#tt").datagrid("getPanel"));
+		}
+	}
+}
+</script>
+
+<!--内容部分start-->
+<!--表单-->
+<div class="detailBox" id="Detail">   
+ <div class="zediewindow">
+    <!-- 警情基本信息 -->
+    <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" data-option="{'title':'警情基本信息','open':true}">
+	  <tr>
+	    <th width="15%" align="right"><i>警情编号</i></th>
+	    <td width="35%"><span id="jqbh"></span></td>
+	     <th width="15%" align="right"><i>警情类型</i></th>
+	    <td width="35%"><span id="jqlxdm"></span></td>
+	  </tr>
+	   <tr>
+	    <th align="right"><i>报警电话</i></th>
+	    <td><span id="bjdh"></span></td>
+	     <th align="right"><i>报警时间</i></th>
+	    <td><span id="bjsj"></span></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>报警内容</i></th>
+	    <td colspan="3"><span id="bjnr"></span></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>警情地点</i></th>
+	    <td colspan="3"><span id="jqdd"></span></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>标准地址</i></th>
+	    <td colspan="3"><span id="jqdz"></span></td>
+	  </tr>
+	  <tr>
+        <th align="right"><i>警情状况</i></th>
+        <td colspan="3"><label><input  type="checkbox" name="jqzk" value="1"/>正在发生</label><label><input  type="checkbox" name="jqzk" value="2"/>有人员伤亡</label>
+        <label><input  type="checkbox" name="jqzk" value="3"/>造成重大损失</label><label><input  type="checkbox" name="jqzk" value="4"/>领导关注</label>
+        </td>
+      </tr>
+	  <tr>
+	    <th align="right"><i>派发部门</i></th>
+	    <td><span id="orgname"></span></td>
+	    <th align="right"><i>处警人</i></th>
+	    <td><span id="xm"></span></td> 
+	  </tr>
+	  <tr>
+	    <th align="right"><i>警情等级</i></th>
+	    <td><span id="jqdjdm"></span></td>
+	    <th align="right"><i>处警人员</i></th>
+	    <td><span id="cjr"></span></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>接警类型</i></th>
+	    <td><span id="jjlx"></span></td>
+	    <th align="right"><i>出动警力</i></th>
+	    <td><span id="cdjl"></span></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>警情类别</i></th>
+	    <td><span id="jqlbdm"></span></td>
+	    <th align="right"><i>警情状态</i></th>
+	    <td><span id="jqclzt"></span></td>
+	  </tr>
+  	  <tr>
+	    <th align="right"><i>报警方式</i></th>
+	    <td><span id="bjfs"></span></td>
+	     <th align="right"><i>接警方式</i></th>
+	    <td><span id="jjfs"></span></td>
+	  </tr>
+	</table>
+	<!-- end -->
+    <!-- 报警人信息 -->
+   <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" data-option="{'title':'报警人信息','open':false}">
+    <tr>
+	    <th width="15%" align="right"><i>身份证号</i></th>
+	    <td width="35%"><span id="bjrsfzh"></span></td>
+	     <th width="15%" align="right"><i>性别</i></th>
+	    <td width="35%"><span id="bjrxbdm"></span></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>报警电话</i></th>
+	    <td><span id="bjdh"></span></td>
+	     <th align="right"><i>联系电话</i></th>
+	    <td><span id="lxdh"></span></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>用户姓名</i></th>
+	    <td><span id="bjdhyhxm"></span></td>
+	     <th align="right"><i>用户地址</i></th>
+	    <td><span id="bjdhyhdz"></span></td>
+	  </tr>
+  </table>
+  <!-- end -->
+  <!-- 接警人信息 -->
+  <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" data-option="{'title':'接警人信息','open':false}">
+    <tr>
+	    <th width="15%" align="right"><i>编号</i></th>
+	    <td width="35%"><span id="jjrbh"></span></td>
+	    <th align="right"><i>管辖单位</i></th>
+	    <td><span id="gxdwdm"></span></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>接警时间</i></th>
+	    <td colspan="3"><span id="jjsj"></span></td>
+	   
+	  </tr>
+  </table>
+  <!-- end -->
+  <!-- 警情辅助信息 -->
+  <table id="table3" width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" data-option="{'title':'警情辅助信息','open':false}">
+	  <tr>
+	    <th width="20%" align="right"><i>有无爆炸</i></th>
+	    <td width="30%"><span id="ywbzxl"></span></td>
+	     <th width="20%" align="right"><i>号牌种类</i></th>
+	    <td width="30%"><span id="bjchpzldm"></span></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>报警车牌号</i></th>
+	    <td><span id="bjcph"></span></td>
+	    <th align="right"><i>被困人数</i></th>
+	    <td><span id="bkrs"></span></td>
+	  </tr>
+  	  <tr>
+	    <th align="right"><i>受伤人数</i></th>
+	    <td><span id="ssrs"></span></td>
+	    <th align="right"><i>死亡人数</i></th>
+	    <td><span id="swrs"></span></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>是否涉外</i></th>
+	    <td><span id="sfsw"></span></td>
+	    <th align="right"><i>外语报警</i></th>
+	    <td><span id="sfswybj"></span></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>警情状态</i></th>
+	    <td><span id="jqztdm"></span></td>
+	    <th align="right"><i>作案工具</i></th>
+	    <td><span id="zagjdm"></span></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>警情等码</i></th>
+	    <td><span id="jqztdm"></span></td>
+	    <th align="right"><i>火灾等级</i></th>
+	    <td><span id="hzdjdm"></span></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>起火建筑结构</i></th>
+	    <td><span id="qhjzjgdm"></span></td>
+	    <th align="right"><i>火灾场所</i></th>
+	    <td><span id="hzcsdm"></span></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>毗邻情况</i></th>
+	    <td><span id="plqk"></span></td>
+	    <th align="right"><i>起火物</i></th>
+	    <td><span id="qhwdm"></span></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>有无逃逸</i></th>
+	    <td><span id="ywty"></span></td>
+	    <th align="right"><i>危化车辆</i></th>
+	    <td><span id="sfswhcl"></span></td>
+	  </tr>
+  </table>
+  <!-- end -->
+    <div class="datalist" data-option="{'title':'处警信息','open':true}" style="width:100%;height:300px">
+  	<div id="tt"> </div>
+	</div>
+    </div>
+</div>
+
+<!--提交按钮-->
+<div class="submitButs"><a  id="feedBackButton" class="but-normal but-red"><i class="fa fa-comment"></i> 反馈信息</a><a  id="cancelButton" class="but-normal but-greenlight"> <i class="fa fa-reply"></i> 返回</a></div>
+<!--内容部分end--> 

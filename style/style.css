@@ -1,0 +1,57 @@
+.topBox {
+/*	background-color: #29788B;
+	width: 100%;
+	height: 50px;*/
+}
+.topBox h1 {
+	font-size: 20px;
+	font-weight: normal;
+	line-height: 50px;
+	color: #FFF;
+	margin: 0px;
+	padding-top: 0px;
+	padding-right: 0px;
+	padding-bottom: 0px;
+	padding-left: 70px;
+	text-shadow: 0px 0px 3px #143943;
+	background-image: url(../images/logo.png);
+	background-repeat: no-repeat;
+	background-position: 12px center;
+	background-size:auto 48px;
+}
+/*合成作战*/
+.icon_hczz {
+	background-image: url(../images/hczz.png);
+}
+/*决策分析*/
+.icon_jcfx {
+	background-image: url(../images/jcfx.png);
+}
+/*接处警*/
+.icon_jcj {
+	background-image: url(../images/jcj.png);
+}
+/*勤务管理*/
+.icon_qwgl {
+	background-image: url(../images/qwgl.png);
+}
+/*统计报表*/
+.icon_tjbb {
+	background-image: url(../images/tjbb.png);
+}
+/*我的任务*/
+.icon_wdrw {
+	background-image: url(../images/wdrw.png);
+}
+/*系统设置*/
+.icon_xtsz{
+	background-image: url(../images/xtsz.png);
+}
+/*预案管理*/
+.icon_yagl{
+	background-image: url(../images/yagl.png);
+}
+/*综合查询*/
+.icon_zhcx{
+	background-image: url(../images/zhcx.png);
+}

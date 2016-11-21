@@ -1,0 +1,272 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行READY方法，代替document.ready执行
+//重要：写在ACTION外的方法是全局方法，尽量不要这么干，以免方法冲突。
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//重要：页面关闭的时候会尝试执行DESTROY方法，请在这里解除事件绑定，销毁对象，以免窗体残留。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+//重要：保证标签完整闭合，否则IE8报错 “ACTION_Window_1426578029038953”未定义
+function ACTION(){
+	var p=this;	
+	var selectOption = null;
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){ 
+		p.find(".datalist").height(p.WRAPER.height()-p.find(".pageTopBox").outerHeight(true)); 
+		p.find("#tt").datagrid("resize"); 
+	}
+	
+	var SearchForm;
+	
+	var ttForm;
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+		
+		var s1=p.find("[name=xltz]");
+		var option=s1.getDataOptions();
+		option["param"]={"orgCode":userData.orgCode};
+		s1.attr("data-option",JSON.stringify(option).replace(/\"/g,"\'"));
+
+		var s2=p.find("[name=xlzh]");
+		var option=s2.getDataOptions();
+		option["param"]={"orgCode":userData.orgCode};
+		s2.attr("data-option",JSON.stringify(option).replace(/\"/g,"\'"));
+		
+		//表单处理
+		SearchForm=new formDeal(p.find("#searchForm"));
+		$(SearchForm).one("HTML_FORMATED",getSelectValue);//绑定格式化完成事件，执行下一步
+		SearchForm.parse();
+		SearchForm.bindData(p.CONDITION);//绑定默认条件
+		
+		//表单处理
+		ttForm=new formDeal(p.find("#tt"));
+		ttForm.parse();
+		ttForm.bindData(p.CONDITION);//绑定默认条件
+
+		//表格例子------------------------------------------EasyUI组件
+		
+		var clumoption=[[
+			{field:'CHECK',title:'复选框',checkbox:true},
+			//{field:'featureId',title:'巡逻特征ID',width:"10%"},
+			{field:'featureName',title:'巡逻特征名称',width:"25%"},
+			//{field:'geometry',title:'特征地理坐标',width:"13%"},
+			{field:'hphm',title:'号牌号码',width:"25%"},
+			//{field:'leaderId',title:'指挥员ID',width:"12%"},
+			//{field:'orgCode',title:'所属部门编码',width:"14%"},
+			{field:'orgName',title:'所属部门名称',width:"30%"},
+			{field:'type',title:'特征物类型',formatter:function(value,record,index){
+	               	if(value == "1"){
+						result = '巡逻路线';
+					}else if(value == "2"){
+						result = '执勤区域';
+					}
+					return result;
+              }}
+			]];
+		p.find("#tt").datagrid({
+			url:"php/equip/GetPoliceFeature_web.php",
+			queryParams:{"event":"FormEdit","content":JSON.stringify({"condition":{"orgCode":userData.orgCode}}),"extend":{}}, //附加参数对象
+			loadFilter:formatCommonJson,  //格式过滤器
+			fit:true,
+			showFooter:true,//显示总计??
+			rownumbers:true,//行号
+			singleSelect:true,
+			fitColumns:true,//宽度自适应
+			striped:true,//条纹
+			//pagination:true,//分页
+			//onDblClickRow:dataGridClick,
+//			onClick:dataGridClick,
+			columns:clumoption
+		}).datagrid('getPager').pagination({  //设置显示列切换按钮
+	//	buttons:$('#buttons');//插入html
+//				buttons:[{
+//					iconCls:'icon-clumconfig',
+//					handler:function(){ClumChocie($('#tt'),$(this))}
+//				}]
+		})
+		
+		//更新一下尺寸
+		p.resize();
+		
+		//安装按钮点击事件
+		p.find(".actionBox a").menuButton({"guid":"123456789","parentid":p.WINID});		
+		//绑定查询按钮点击
+		p.find("#searchButton").bind("click",bindData);
+		//解除绑定按钮点击
+		p.find("#unBind").bind("click",unBindData);	
+		
+		p.find("[name='xltzlx']").bind("change",function(){   //绑定二级联动onchange事件
+			var xltz = $(this).val();
+			getFormData(xltz);
+		})
+	}
+	
+	//绑定
+	function bindData(){
+		if(SearchForm.check()){ //数据校验
+			//调用PHP绑定数据
+			var searchCondition=SearchForm.getData();//获取表单条件
+			bindDataLogic(searchCondition);
+		}
+	}
+	
+	function bindDataLogic(searchCondition){
+		var postData={
+			//"event":"TRANS",
+			//"extend":{"eventswitch":"search"},
+			"content":{"condition":{"id":searchCondition['xlzh'],
+									"featureId":searchCondition['xltz'],
+									"roleType":3
+						}}
+		};
+		//console.log(url);
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){
+			if (backJson['head']['code'] == 0) {
+				$.alert(backJson['code']['message']);
+			} else {
+				$.alert("绑定成功");
+				p.find("#tt").datagrid("reload");
+			}
+		});
+		$(Loader).bind("SYS_ERROR",function(e,msg){
+			$.alert("绑定失败" + (msg==null || msg=="")? "" : ":"+msg);
+		});
+		Loader.POSTDATA("php/equip/UpdateOrAddPoliceFeature_web.php",postData);
+	}
+	
+	//解绑
+	function unBindData(){
+		var selectedData = p.find("#tt").datagrid("getSelections");
+		if(selectedData.length==0) {
+			$.alert("没有选择解绑数据");
+			return
+		} else {
+			//只能选择一行数据，所以下面写选择第一条数据
+			unBindDataLogic(selectedData);
+		}
+	}
+	
+	function unBindDataLogic(selectedData){
+		var postData={
+			//"event":"TRANS",
+			//"extend":{"eventswitch":"search"},
+			"content":{"condition":{"id":selectedData[0]['id'],//巡逻组合ID
+									"featureId":selectedData[0]['featureId'],//特征ID
+									"roleType":3
+						}}
+		};
+		//console.log(url);
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){
+			if (backJson['head']['code'] == 0) {
+				$.alert(backJson['code']['message']);
+			} else {
+				$.alert("解绑成功");
+				p.find("#tt").datagrid("reload");
+			}
+		});
+		$(Loader).bind("SYS_ERROR",function(e,msg){
+			$.alert("解绑失败" + (msg==null || msg=="")? "" : ":"+msg);
+		});
+		//TODO
+		Loader.POSTDATA("php/equip/DeletePoliceFeature_web.php",postData);
+	}
+
+
+	function getSelectValue() {
+		var postData={
+			//"event":"TRANS",
+			//"extend":{"eventswitch":"search"},
+			"content":{"condition":{"orgCode":userData.orgCode}}
+		};
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){
+			if (backJson['head']['code'] == 1) {
+				selectOption = backJson;
+				var xltzlx = p.find("[name='xltzlx']");
+				var filter = "";
+				for(var i = 0; i < xltzlx.length; i++) {
+					if(xltzlx[i].checked == true){
+						filter = xltzlx[i].value;
+					}
+				}
+				if(filter!=""){
+					var dataOption = [];
+					for(var i = 0; i < backJson.value.length; i++) {
+						if(backJson.value[i].type == filter){
+							dataOption.push(backJson.value[i]);
+						}
+					}
+					p.find("[name=xltz]").changeOption(dataOption);	
+				}
+			}
+		});
+		$(Loader).bind("SYS_ERROR",function(e,msg){
+		});
+		Loader.POSTDATA("php/equip/GetFeature_web.php",postData);
+	}
+	
+	function getFormData(xlzt){ 
+		var dataOption = [];
+		for(var i = 0; i < selectOption.value.length; i++) {
+			if(selectOption.value[i].type == xlzt){
+				dataOption.push(selectOption.value[i]);
+			}
+		}
+		p.find("[name=xltz]").changeOption(dataOption);	
+	}
+	
+}
+</script>
+
+<!--内容部分start-->
+
+<div class="pageTopBox">
+  <div id="dataGridActionBox"  style="padding:3px" > 
+    <!--按钮-->
+     <a  class="but-small but-green" id="searchButton" ><i class="fa fa-plus"></i>绑定</a>
+     <a  class="but-small but-green" id="unBind" ><i class="fa fa-close"></i>解绑</a>
+   </div>
+  <!--查询-->
+  <div class="searchBox">
+    <form id="searchForm">
+      <table border="0" cellspacing="0" cellpadding="3">
+        <tr>
+          <td><ul>
+             
+              <li> <i>巡逻特征类型:</i>
+              路线:<input type="radio" name="xltzlx" value="1" checked="checked"/> 区域:<input type="radio" name="xltzlx" value="2"/>
+               
+             
+              </li>
+              <li> <i>巡逻特征:</i>
+                <select  name="xltz" style="width:160px">
+                <option></option>
+                </select>
+              </li>
+               <li> <i>巡逻组合:</i>
+                <select  name="xlzh" style="width:160px"  data-option="{'url':'php/equip/GetDutyGroud_web.php','param':{}}" >
+                </select>
+              </li>
+            </ul>
+            <div class="cl"></div></td>
+          
+        </tr>
+      </table>
+    </form>
+</div>
+</div>
+<!--表格-->
+<div class="datalist">
+  <div id="tt"> </div>
+</div>
+
+<!--内容部分end--> 
+

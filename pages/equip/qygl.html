@@ -1,0 +1,628 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行READY方法，代替document.ready执行
+//重要：写在ACTION外的方法是全局方法，尽量不要这么干，以免方法冲突。
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//重要：页面关闭的时候会尝试执行DESTROY方法，请在这里解除事件绑定，销毁对象，以免窗体残留。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+//重要：保证标签完整闭合，否则IE8报错 “ACTION_Window_1426578029038953”未定义
+function ACTION(){
+	var p=this;	
+	var mapObj = null;
+	var refLayer = null;
+	var fenceLayer = null;
+	var fencePolygon = null;
+	var ft = {};
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){ 
+		p.find(".datalist").height(p.WRAPER.height()-p.find(".pageTopBox").outerHeight(true)); 
+		p.find("#tt").datagrid("resize"); 
+	}
+	
+	var SearchForm;	
+	
+	this.DESTROY=function(){ 
+		if(fenceLayer){
+			fencePolygon.deactivate();
+			clearInfoWindow();
+			fenceLayer.removeAllFeatures();
+		}
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){
+		//地图加载完以后执行mapInit方法
+		mapInterval = setInterval(function() {  
+				mapObj = mainWindow.mapObj;
+			var controls = mapObj.controls;
+			if(mapObj&&controls){
+				p.mapInit();
+				window.clearInterval(mapInterval);
+				mapInterval=null; 
+			}
+		}, 2000);	
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+		
+		//表单处理
+		SearchForm=new formDeal(p.find("#searchForm"));
+		SearchForm.parse();
+		SearchForm.bindData(p.CONDITION);//绑定默认条件		
+		
+		//表格例子------------------------------------------EasyUI组件
+		var clumoption=[[
+			{field:'featureId',title:'',width:"10%",fixed:true,align:"center",checkbox:true},
+			{field:'featureName',title:'区域名称',width:"33%",resizable:true,align:"center"},
+			{field:'orgName',title:'绘制部门',width:"33%",resizable:true,align:"center"},
+			{field:'groupRecord',title:'操作',width:65,align:'center', resizable:false, 
+	            formatter:function(value,rec){
+	            	var btn = "";
+	            	if(value.length>0){
+	            		btn = '<a  id="delPlan" class="but-small but-green">解绑</a>';
+	            	}else{
+	            		btn = '<a  id="addPlan" class="but-small but-red">绑定</a>';
+	            	}
+	                return btn;  
+	            }  
+        	},
+        	{field:'groupsId',title:'巡逻组',width:70,align:'center', resizable:false, 
+	            formatter:function(value,rec){
+	            	var btn = "";
+	            	if(rec['groupsId']>0){
+	            		btn = '<a  id="closePlan" class="but-small but-green">查看</a>';
+	            	}
+	                return btn;  
+	            }  
+        	}
+			]];
+		p.find("#tt").datagrid({
+			url:"php/equip/GetEquipFeature_web.php",
+			queryParams:{"orgCode":userData.orgCode}, //附加参数对象
+			loadFilter:formatHostJson,  //格式过滤器
+			fit:true,
+			showFooter:true,//显示总计
+			rownumbers:false,//行号
+			singleSelect:false,//单选
+			fitColumns:true,//宽度自适应
+			striped:true,//条纹
+			pagination:true,//分页
+			onDblClickRow:dataGridClick,
+			onClickCell:dataGridCellClick,
+/*			onClickRow:function(){
+				console.log("行点击");	
+			},*/
+			columns:clumoption
+		})
+		
+		//更新一下尺寸
+		p.resize();
+		
+		//安装按钮点击事件
+		//p.find(".actionBox a").menuButton({"parentid":p.WINID});		
+		p.find(".actionBox a:eq(1)").bind("click",delPolygon);	
+		p.find("#add").bind("click",addFeature);	
+		p.find("#del").bind("click",delFeature);	
+		//绑定查询按钮点击
+		p.find("#searchButton").bind("click",StartSearch);		
+		
+	}
+	
+	this.mapInit = function(){
+		mapObj = mainWindow.mapObj;
+		var controls = mapObj.controls;
+		for(var i=0;i<controls.length;i++){
+			if(controls[i].CLASS_NAME=="OpenLayers.Control.SelectFeature"){
+				selectFeature = controls[i];
+				break;
+			}
+		}
+		
+		refLayer = mapObj.getLayersByName("Ref Layer")[0];
+		
+		addFenceLayer();
+		snap = new OpenLayers.Control.Snapping({
+					layer: fenceLayer,
+					targets: [fenceLayer,refLayer],
+					greedy: false
+				});
+		snap.activate();
+
+		var layers = selectFeature.layers;
+		layers.push(fenceLayer);
+		selectFeature.setLayer(layers);	
+		
+	}
+	
+	function addFenceLayer(){
+		var eventListeners = {
+	           'featureselected':function(evt){
+	              var feature = evt.feature;
+	              openFence(feature);
+	           },
+	           'featureunselected':function(evt){
+	               var feature = evt.feature;
+	               mapObj.removePopup(feature.popup);
+	               feature.popup.destroy();
+	               feature.popup = null;
+	           }
+	       }
+	    
+	    fenceLayer = mapObj.getLayersByName("勤务区域")[0];
+	    fenceLayer.events.on(eventListeners);
+		//fenceLayer = new OpenLayers.Layer.Vector("巡逻区域",{eventListeners: eventListeners});
+		fenceLayer.setVisibility(false);
+		
+		//mapObj.addLayer(fenceLayer);
+		
+		fencePolygon = new OpenLayers.Control.DrawFeature(fenceLayer, OpenLayers.Handler.Polygon,{ multi: true});
+		fencePolygon.events.on({"featureadded" : function(drawGeometryArgs){
+			finished = true;
+			//p.find("#drawPRbtn").removeClass("nowid"); //变正常
+			fenceClick = true;
+			refLayer.removeAllFeatures();
+			fencePolygon.deactivate();
+			var polygon = drawGeometryArgs.feature;
+			var path = polygon.geometry.components[0].components[0].components;
+			if(path.length==2&&path[0].x==path[1].x&&path[0].y==path[1].y){
+				movePadingPressed();
+				fenceLayer.removeFeatures(polygon);
+				return;
+			}
+			polygon.path = path;
+			openFence(polygon);	
+		}});
+		
+		mapObj.addControl(fencePolygon);
+		
+		return fenceLayer;
+	}
+	
+	function delFirstPoint() {
+		fencePolygon.cancel();
+		popup.destroy();
+	}
+	
+	function onModify(point, geometry) {
+		var type = geometry.componentTypes[0];
+		if(type=="OpenLayers.Geometry.Polygon"){
+			if (geometry.components[0].components[0].components.length==3) {
+				popup = new OpenLayers.Popup.FramedCloud('popup',
+					new OpenLayers.LonLat(point.x,point.y),
+					new OpenLayers.Size(100,100),
+					'<a  id="delButton" class="but-small" style="background-color: #A8A0A3;"><i class="fa fa-th-large"></i> 放弃</a>');
+				mapObj.addPopup(popup);
+	            popup.show();
+	            var delHtml =$(popup.contentDiv);
+		               
+	             delHtml.find("#delButton").unbind();
+	             delHtml.find("#delButton").bind("click",function(evt){
+	             		delFirstPoint();
+	             });
+			} else if (geometry.components[0].components[0].components.length==4) {
+				popup.destroy();
+			}
+		}else if(type=="OpenLayers.Geometry.LineString"){
+			if (geometry.components[0].components.length==2) {
+				popup = new OpenLayers.Popup.FramedCloud('popup',
+					new OpenLayers.LonLat(point.x,point.y),
+					new OpenLayers.Size(100,100),
+					'<a  id="delButton" class="but-small" style="background-color: #A8A0A3;"><i class="fa fa-th-large"></i> 放弃</a>');
+				mapObj.addPopup(popup);
+	            popup.show();
+	            var delHtml =$(popup.contentDiv);
+		               
+	             delHtml.find("#delButton").unbind();
+	             delHtml.find("#delButton").bind("click",function(evt){
+	             		delFirstPoint();
+	             });
+			} else if (geometry.components[0].components.length==3) {
+				popup.destroy();
+			}
+		}
+		
+		
+		refLayer.removeAllFeatures();
+		//var features = mainWindow.onModify(point, geometry,routeLine,fencePolygon);
+		//refLayer.addFeatures(features);
+		/*
+		for (var i=0;i<3;i++){
+			var x = point.x+Math.random()*10-5;
+			var y = point.y+Math.random()*10-5;
+			var wkt = "LINESTRING(" + point.x + " " + point.y + "," + x + " " + y + ")";
+			var line = OpenLayers.Geometry.fromWKT(wkt);
+			var feature = new OpenLayers.Feature.Vector(line);
+			refLayer.addFeatures([feature]);
+		}
+		*/
+
+		var url = "http://10.80.8.204:8090/JYYW/DXLX.ashx?geometry="+point.x+","+point.y;
+		console.log(url);
+		var postData={
+			"event":"TRANS",
+			"extend":{"eventswitch":"search"},
+			"content":{"condition":{"url":url}}
+		};
+		//console.log(url);
+		var Loader = new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){
+			if (finished) {
+				finished = false;
+				return;
+			}
+			//alert(JSON.stringify(backJson));
+			var value = backJson['value'];
+			var status = $(value).find("Status").text();
+			if(status!="Success"){
+				return;
+			}
+			//alert(value);
+			var path = $(value).find("path");					
+			
+			for (var i=0;i<path.length;i++) {
+				var wkt = "LINESTRING(";
+				var pointStr = path[i].innerHTML;
+				var regS = new RegExp("</x><y>","g");
+				pointStr = pointStr.replace(regS," ");
+				var regS = new RegExp("</y></point><point><x>","g");
+				pointStr = pointStr.replace(regS,",");
+				var regS = new RegExp("<point><x>","g");
+				pointStr = pointStr.replace(regS,"");
+				var regS = new RegExp("</y></point>","g");
+				pointStr = pointStr.replace(regS,"");
+				
+				wkt += pointStr + ")";
+				//alert(wkt);
+				console.log(wkt);
+				var line = OpenLayers.Geometry.fromWKT(wkt);
+				var feature = new OpenLayers.Feature.Vector(line);
+				refLayer.addFeatures([feature]);
+			}
+		});
+		$(Loader).bind("SYS_ERROR",function(e,msg){
+			$.error("调用失败!");
+		});
+		Loader.POSTDATA("php/trans.php",postData);
+	}
+	
+	function onFinish(point, geometry) {
+		finished = true;
+		refLayer.removeAllFeatures();
+	}
+	
+	/*清除所有popup*/
+	function clearInfoWindow(){
+		//selectFeature.unselectAll();
+		if(!mapObj){
+			return;
+		}
+		var popArr = mapObj.popups;
+		if(!(popArr&&popArr.length>0)){
+			return;
+		}
+		var layerArr = mapObj.layers;
+		for (var i=0;i<popArr.length;i++){
+			mapObj.removePopup(popArr[i]);
+		}
+		
+	}
+	
+	/*清除相对应的feature*/
+	function removeAllFeatures(vector,geometry){
+		var vectors = new Array();
+		vectors.push(geometry);
+		vector.removeFeatures(vectors);
+	}
+	
+	
+
+	
+	
+	
+	
+	//打开电子围栏详细信息窗口
+	function openFence(ft) {
+		var html = '<div id="popupFenceContent" style="height:50px"><div id="fenceForm"><table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab"><tr><th width="20%" align="right"><i>区域名称</i></th><td width="80%"><input type="text" name="featureFenceName" id="featureFenceName" class="must"  style="width:200px" /></td></tr><tr><td colspan="2" align="center"><a  id="fenceSaveButton" class="but-small but-red"><i class="fa fa-save"></i> 保存</a> <a  id="fenceCancelButton" class="but-small but-yellow"> <i class="fa fa-reply"></i> 删除</a></td></tr></table></div></div>';
+		ft = ft;
+		ft.type=2;
+		clearInfoWindow();
+		popup = new OpenLayers.Popup.FramedCloud("fencePop", 
+			 ft.geometry.getBounds().getCenterLonLat(),
+			 null,
+			 html,
+			 null, false, function(){
+				refLayer.removeAllFeatures();
+				clearInfoWindow();
+				if(!ft.trafficInfo){
+					removeAllFeatures(fenceLayer,ft);
+				}
+			});
+		ft.popup = popup;
+		mapObj.addPopup(popup);
+		var fenceHtml =$(popup.contentDiv);
+		if(ft.trafficInfo){
+			fenceHtml.find("#featureFenceName").val(ft.trafficInfo.featureName);
+		}
+
+		fenceHtml.find("#fenceCancelButton").unbind();
+		fenceHtml.find("#fenceCancelButton").bind("click",function(){ 
+			refLayer.removeAllFeatures();
+			clearInfoWindow();
+			if(!ft.trafficInfo){
+				removeAllFeatures(fenceLayer,ft);
+			} else {
+				var params ={};
+				params['featureId']=ft.trafficInfo.featureId;
+				var Loader=new AJAXObj();
+				$(Loader).bind("JSON_LOADED",function(e,backJson){	
+					var result = backJson["head"]['code'];
+					if(result==1){
+						$.message("操作成功!");
+						clearInfoWindow();
+						fenceLayer.removeAllFeatures();
+						p.refesh();
+					}
+							
+				})
+				Loader.POSTDATA("php/equip/DeleteFeature_web.php",{"event":"Feature","content":{"condition":params},"extend":{}});
+			}
+		});
+		fenceHtml.find("#fenceSaveButton").unbind();
+		fenceHtml.find("#fenceSaveButton").bind("click",function(){ 
+			var featureName = fenceHtml.find("#featureFenceName").val();
+			if(featureName==""){
+				$.error("名称不能为空!");
+				return;
+			}
+			var params ={};
+			var path = ft.geometry;
+			params['geometry']=path.toString();
+			params['featureName']=featureName;
+			params['type']="2";
+			params['featureId']=ft.trafficInfo ? ft.trafficInfo.featureId : '';
+			//params = JSON.stringify(params);
+			var Loader=new AJAXObj();
+			$(Loader).bind("JSON_LOADED",function(e,backJson){	
+				debugger;
+				var result = backJson["head"]['code'];
+			  if(result==1){
+					$.message("操作成功!");
+					clearInfoWindow();
+					p.refesh();
+					if (ft.trafficInfo) {
+						var info = ft.trafficInfo;
+						info.featureName = featureName;
+						info.geometry = params['geometry'];
+						fenceLayer.removeAllFeatures();
+						addPolygon(info);
+					} else {
+						ft.trafficInfo = backJson["value"];
+						ft.geometry = params['geometry'];
+						fenceLayer.removeAllFeatures();
+						addPolygon(ft.trafficInfo);
+					}
+					
+				}
+						
+			})
+			Loader.POSTDATA("php/equip/UpdateOrAddDutyFeature_web.php",{"event":"Feature","content":{"condition":params},"extend":{}});				
+			
+		});
+		
+	}
+	
+	/**
+	 * addLine
+	 * 添加线覆盖物
+	 * 添加巡逻路线
+	 *trafficInfo:巡逻路线store对象
+	 */
+	function addPolygon(trafficInfo) {
+		//解析点队列
+		var lineArr = new Array();
+		var polyline = null;
+		if(fenceLayer){
+			polyline = OpenLayers.Geometry.fromWKT(trafficInfo.geometry);
+			var featureLine = new OpenLayers.Feature.Vector();
+				featureLine.geometry = polyline;
+			
+			featureLine.trafficInfo = trafficInfo;
+			clearInfoWindow();
+			fenceLayer.removeAllFeatures();
+			fenceLayer.setVisibility(true);
+			fenceLayer.addFeatures(featureLine);
+			mapObj.zoomToExtent(featureLine.geometry.getBounds(),false);  
+		}
+		return polyline;
+	}
+	
+	function onFeatureUnselect(feature) {
+		if(feature.popup){
+            mapObj.removePopup(feature.popup);
+            feature.popup.destroy();
+            feature.popup = null;
+		}
+    }
+	
+	
+	
+	function addFeature(){
+		if(fenceLayer&&fencePolygon){
+			clearInfoWindow();
+			fenceLayer.removeAllFeatures();
+			fenceLayer.setVisibility(true);
+			fencePolygon.activate();
+			fencePolygon.handler.callbacks = OpenLayers.Util.extend(
+				{
+					point: onModify,
+					done: onFinish
+				},
+				fencePolygon.handler.callbacks
+			);
+		}
+	}
+	
+	function delFeature(){
+		var rowsData = p.find('#tt').datagrid('getChecked');
+		
+	}
+	
+	//datagrid行点击
+	function dataGridClick(rowIndex,rowData){ 
+		addPolygon(rowData);
+	}
+	
+	function dataGridCellClick(index,field,value){
+		var rowData = p.find("#tt").datagrid("getRows")[index];
+		if(field=="groupRecord"){
+			if(value.length>0){
+				$.confirm("是否确认执行该操作",function(result){
+					if(result){
+						deleteGroupFeature(rowData);
+					}
+				});
+			}else{
+				WINDOW.open({"name":"datagrid_"+index,"width":600,"height":600,"url":"pages/equip/qySelecter.html","callback":function(result){addGroupCar(result,rowData)},"title":"巡逻组","lock":true},{"method":"update","parentid":p.WINID,"rowData":rowData},p.find("#tt").datagrid("getPanel"))
+			}
+		}else if(field=="groupsId"){
+				WINDOW.open({"name":"datagrid_"+index,"width":400,"height":300,"url":"pages/equip/groupFeatureSelect.html","title":"巡逻组","lock":true},{"method":"update","parentid":p.WINID,"rowData":rowData},p.find("#tt").datagrid("getPanel"))
+		}
+		
+	}
+	
+	function deleteGroupFeature(rowData){
+		var postData={
+			//"event":"TRANS",
+			//"extend":{"eventswitch":"search"},
+			"content":{"condition":{"featureId":rowData['featureId'],//特征ID 
+			}}
+		};
+		//console.log(url);
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){
+			if (backJson['head']['code'] == 0) {
+				$.alert(backJson['code']['message']);
+			} else {
+				$.alert("解绑成功");
+				p.find("#tt").datagrid("reload");
+			}
+		});
+		$(Loader).bind("SYS_ERROR",function(e,msg){
+			$.alert("解绑失败" + (msg==null || msg=="")? "" : ":"+msg);
+		});
+		//TODO
+		Loader.POSTDATA("php/equip/DeleteGroupFeature_web.php",postData);
+	}
+	
+	function delPolygon(){
+		var selectedData = p.find("#tt").datagrid("getSelections");
+		if(selectedData.length==0) {
+			$.alert("请选择要删除的数据");
+			return
+		} else {
+			$.confirm("确定删除选中区域？",function(rs){
+				if(rs){
+					var postData={
+						"event":"TRANS",
+						"extend":{"eventswitch":"search"},
+						"content":{"condition":selectedData}
+					};
+					//console.log(url);
+					var Loader=new AJAXObj();
+					$(Loader).bind("JSON_LOADED",function(e,backJson){
+						if (backJson['head']['code'] == 0) {
+							$.alert(backJson['value']);
+						} else {
+							$.alert(backJson['value']);
+							p.refesh();
+						}
+					});
+					//TODO
+					Loader.POSTDATA("php/equip/DeleteQy_web.php",postData);
+				}
+			})
+		}
+	}
+	
+	function addGroupCar(result,rowData){
+		if(result.length==0){
+			return;
+		}
+		//保存失败
+		var errorBack=function(e){				
+		}	
+		//保存成功
+		var saveResult=function(e,BackJson){
+			$.message("保存成功！",2000);
+			p.refesh(); //执行父窗体方法
+		}
+		//获取表单数据
+		rowData['gids']=result;
+		p.find("#saveButton").addClass("disable");//锁按钮			
+		var postData={"event":"saveForm",
+								"extend":{"eventswitch":"save"},
+								"content":{"condition":p.CONDITION,"value":rowData}
+								};		
+		var Loader=new AJAXObj();
+		$(Loader).unbind().one("JSON_LOADED",saveResult).one("SYS_ERROR",errorBack);			
+		Loader.POSTDATA("php/equip/InsertGroupFeature_web.php",postData);
+	}
+	
+	//查询
+	function StartSearch(){
+		if(SearchForm.check()){ //数据校验
+			var searchCondition=SearchForm.getData();//获取表单条件
+			//刷新DataGrid
+			p.find("#tt").datagrid("reload",searchCondition);
+		}
+	}
+	
+	//子窗口刷新父页面组件
+	this.refesh=function(){
+		if(fenceLayer){
+			clearInfoWindow();
+			fenceLayer.removeAllFeatures();
+		}
+		p.find("#tt").datagrid("reload");
+	}
+	
+	this.getMsgFromChild=function(msg){
+		WINDOW.hideSide();//隐藏侧面内容
+		$.alert(msg)	
+	}
+
+}
+</script>
+
+<!--内容部分start-->
+
+<div class="pageTopBox">
+  <div id="dataGridActionBox"  style="padding:3px" > 
+    <!--按钮-->
+    <div style="margin-bottom:3px" class="actionBox">
+    	<a id="add" class="but-small but-green"><i class="fa fa-plus"></i>添加</a>  
+    	<a  class="but-small but-green" ><i class="fa fa-remove"></i>删除</a> 
+    <!-- <a id="del"  class="but-small but-green"><i class="fa fa-close"></i>删除</a>  --> </div>
+  </div>
+  <!--查询-->
+  <div class="searchBox">
+    <form id="searchForm">
+      <table border="0" cellspacing="0" cellpadding="3">
+        <tr>
+          <td><ul>
+              <li> <i>区域名称:</i>
+              	<input  type="text" name="featureName" id="featureName"  style="width:160px"/> 
+              </li>
+            </ul>
+            <div class="cl"></div></td>
+          <td width="65"   valign="top"><a  id="searchButton" class="but-small but-red"><i class="fa fa-search"></i> 查询</a></td>
+        </tr>
+      </table>
+    </form>
+  </div>
+</div>
+<!--表格-->
+<div class="datalist">
+  <div id="tt"> </div>
+</div>
+<!--内容部分end--> 

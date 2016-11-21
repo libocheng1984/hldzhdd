@@ -1,0 +1,26 @@
+{
+      "head":{"code":1,"message":""},      
+      "value":[{
+              "value":"p_1",
+              "text":"首页",
+              "children":[{
+                      "value":"p_11",
+                      "text":"进行中任务",
+                      "children":[]
+                  },{
+                      "value":"p_12",
+                      "text":"授权管理",
+                      "children":[]
+                  },{
+                      "value":"p_13",
+                      "text":"个人信息"
+                  },{
+                      "value":"p_14",
+                      "text":"修改密码"
+                  },{
+                      "value":"p_15",
+                      "text":"功能设置"
+                  }]
+              }],
+        "extend":{}
+}

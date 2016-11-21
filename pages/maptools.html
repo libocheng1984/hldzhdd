@@ -1,0 +1,1303 @@
+<script type="text/javascript">
+function ACTION(){
+	var p=this;
+	this.bumen=[];
+	var isClick = true;
+	var routeClick = true;
+	var fenceClick = true;
+	var mapObj = null;
+	var refLayer = null;
+	var routeLayer = null;
+	var fenceLayer = null;
+	var routeLine = null;
+	var fencePolygon = null;
+	var ft = {};
+	var mapInterval=null
+	var mapTool = null;
+	var isDisplay = false;
+	var SOUND = null;
+	
+	this.READY=function(){
+		//地图加载完以后执行mapInit方法
+		mapInterval = setInterval(function() {  
+				mapObj = mainWindow.mapObj;
+			var controls = mapObj.controls;
+			if(mapObj&&controls){
+				p.mapInit();
+				window.clearInterval(mapInterval);
+				mapInterval=null; 
+				var userIds = ["hldadmin"];
+				if(userData&&userIds.toString().indexOf(userData.userId)>=0){
+					p.find("#drawMRbtn").show();
+					isDisplay = true;
+				}
+			}
+		}, 2000);				
+		/*
+		//圆形快捷按钮-----------------------------------
+		var icons=[
+							{"name":"tools_1","icon":"fa fa-flag","title":"工具一"},
+							{"name":"tools_2","icon":"fa fa-star","title":"工具二"},
+							{"name":"tools_3","icon":"fa fa-heart","title":"工具三"},
+							{"name":"tools_4","icon":"fa fa-bookmark","title":"工具四"},
+							{"name":"tools_5","icon":"fa fa-map-marker","title":"工具五"}
+						 ]
+		var comToolsIcon=new RollToolBar(icons,{"pos":[$(window).width()-200,$(window).height()-200],"zindex":9000});
+		$(comToolsIcon).bind("TOOLICON_CLICK",function(e,icon){
+			console.log("按钮点击："+icon["name"])
+		})
+		*/
+		//-----------------------------------------------
+		
+		//头部按钮和查询----------------------------
+		p.WINDOW.container.one("mouseenter",p.show).one("click",p.show);
+		p.find(".dropToolBar a:not(.closebut)").bind("click",openAwindow); //按钮点击事件		
+		
+		//全局模糊检索
+		var dropOption=[{"text":"巡逻组","value":"groupLayer"},{"text":"350兆","value":"m350Layer"},{"text":"移动警务","value":"modelLayer"},{"text":"内保单位","value":"nbdwLayer"}];
+		var gSearch=new globalSearch($("div.topSearchBox"),dropOption);//dropOption可以为空
+		gSearch.install();
+		$(gSearch).bind("GLOBAL_SEARCH",function(e,pobj){ //查询事件
+		 	//alert("查询条件："+JSON.stringify(pobj["condition"]));
+		 	topSearchLayer(pobj["condition"]);
+		 })	 
+		 /*
+		 //部门过滤选择		
+		 p.find(".bumenfilter").bind("click",selectBuMen);	
+		 */
+		 //安装下拉工具按钮		 
+		 p.find(".fm_anydroplist").DropDown();
+		 
+		 //声音播放对象
+		 SOUND=new SoundPlayer("JsLib/sound/baojing.mp3");
+		 p.find("#alarmsound").bind("click",function(){ 
+			 if($(this).find("i").hasClass("fa-volume-off")){
+				$(this).find("i").removeClass("fa-volume-off").addClass("fa-volume-up");				
+				SOUND.enabled();
+			 }else{
+				 $(this).find("i").removeClass("fa-volume-up").addClass("fa-volume-off");	
+				 SOUND.disabled();
+				 SOUND.stop();	
+			 }
+		 })
+	}
+	
+	//播放声音
+	this.playSound=function(){
+		SOUND.play();	
+	}
+	//停止声音
+	this.stopSound=function(){
+		SOUND.stop();	
+	}
+	
+	function topSearchLayer(obj){
+		var postData={
+					"event":"EVENT",
+					"extend":{"eventswitch":"load"},
+					"content":{"condition":obj}
+				};
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){	
+			var result = backJson["value"];
+			if(result&&result.length>0){
+				var action = WINDOW.getActionById(p.WINID+"_SearchGrid");
+   				if(action){
+   					//"features":cameraRound,"circleFeature":circleFeature,"radiusMarker":radiusMarker,"miter":miter
+   					action.CONDITION["result"]= result;
+   					action.CONDITION["type"]= obj['type'];
+					WINDOW.reload(p.WINID+"_SearchGrid");
+   					//action.loadCameraData(cameraRound,circleFeature);
+   				}else{
+   					WINDOW.open({"name":p.WINID+"_SearchGrid","width":460,"height":450,"url":"pages/zhdd/topSearchLayer.html","title":"查询列表",'side':'right','fitscreen':true,'position':'right_top','locksize':true},{"result":result,"type":obj['type']});
+   				}
+			}else{
+				$.message("未检索到数据!");
+			}
+		});
+		
+		Loader.POSTDATA("php/layer/topSearchLayer.php",postData);
+	}
+	
+	//部门过滤选择
+	function selectBuMen(){ 
+		var inputobj=p.find(".bumenfilter input");
+		var textInput=p.find(".bumenfilter span");		
+		var option={"name":"部门过滤","url":"pages/treeSelector_search.html","width":600,"height":400,"lock":true,"mulit":true};
+		//弹出配置 
+		option["position"]=[textInput.offset().left-28,30];
+		
+		option["name"]="popSelect_"+(new Date()).getTime()+Math.floor(Math.random()*1000);	
+		option["callback"]=function(values){
+			 inputobj.val(values["value"]);
+			 p.bumen=values["value"]?values["value"].split(","):[];
+			 textInput.text(values["text"]||"部门过滤").attr("title",values["text"]);
+		 };
+		WINDOW.open(option,{"values":{"value":inputobj.val(),"text": textInput.text()}},textInput);	
+	}
+	
+	//下拉
+	this.show=function(){ 
+		if(!p.WINDOW.container.hasClass("open")){
+			p.WINDOW.container.addClass("open");
+			p.WINDOW.container.unbind();
+			p.find(".dropToolBar a.closebut").unbind().bind("click",p.hide);//关闭工具条点击			
+		}
+	}
+	//折叠
+	this.hide=function(){ 
+		p.WINDOW.container.removeClass("open");
+		setTimeout(function(){
+			p.WINDOW.container.unbind().one("mouseenter",p.show).one("click",p.show);
+		},600);
+	}
+	
+	this.mapInit = function(){
+		mapTool = new MapTool();
+		mapObj = mainWindow.mapObj;
+		var controls = mapObj.controls;
+		for(var i=0;i<controls.length;i++){
+			if(controls[i].CLASS_NAME=="OpenLayers.Control.SelectFeature"){
+				selectFeature = controls[i];
+				break;
+			}
+		}
+		/*
+		var styles = new OpenLayers.StyleMap({
+					"default": new OpenLayers.Style({
+						strokeColor: "red",
+						strokeWidth: 2
+					})
+				});
+		*/
+		refLayer = mapObj.getLayersByName("Ref Layer")[0];
+		//refLayer = new OpenLayers.Layer.Vector("Ref Layer",{styleMap: styles,displayInLayerSwitcher:false});
+		
+		//addRouteLayer();
+		//addFenceLayer();
+		addMrLayer();
+		//mapObj.addLayer(refLayer);
+		
+		//snap = new OpenLayers.Control.Snapping({
+		//			layer: routeLayer,
+		//			targets: [routeLayer,fenceLayer,refLayer],
+		//			greedy: false
+		//		});
+		//snap.activate();
+	
+		//snap1 = new OpenLayers.Control.Snapping({
+		//	layer: fenceLayer,
+		//	targets: [routeLayer,fenceLayer,refLayer],
+		//	greedy: false
+		//});
+		//snap1.activate();
+
+		snap2 = new OpenLayers.Control.Snapping({
+			layer: mrLayer,
+			targets: [mrLayer,refLayer],
+			greedy: false
+		});
+		snap2.activate();
+
+		var layers = selectFeature.layers;
+		layers.push(mrLayer);
+		//layers.push(routeLayer,fenceLayer,mrLayer);
+		selectFeature.setLayer(layers);	
+		
+		//p.loadFeatureData();
+		p.loadMrData();//加载责任区数据
+		
+		mapTool.loadToolLayer();
+	}
+	
+	function delFirstPoint() {
+		routeLine.cancel();
+		fencePolygon.cancel();
+		mrDrawCtl.cancel();
+		popup.destroy();
+	}
+
+	function onModify(point, geometry) {
+		var type = geometry.componentTypes[0];
+		if(type=="OpenLayers.Geometry.Polygon"){
+			if (geometry.components[0].components[0].components.length==3) {
+				popup = new OpenLayers.Popup.FramedCloud('popup',
+					new OpenLayers.LonLat(point.x,point.y),
+					new OpenLayers.Size(100,100),
+					'<a  id="delButton" class="but-small" style="background-color: #A8A0A3;"><i class="fa fa-th-large"></i> 放弃</a>');
+				mapObj.addPopup(popup);
+	            popup.show();
+	            var delHtml =$(popup.contentDiv);
+		               
+	             delHtml.find("#delButton").unbind();
+	             delHtml.find("#delButton").bind("click",function(evt){
+	             		delFirstPoint();
+	             });
+			} else if (geometry.components[0].components[0].components.length==4) {
+				popup.destroy();
+			}
+		}else if(type=="OpenLayers.Geometry.LineString"){
+			if (geometry.components[0].components.length==2) {
+				popup = new OpenLayers.Popup.FramedCloud('popup',
+					new OpenLayers.LonLat(point.x,point.y),
+					new OpenLayers.Size(100,100),
+					'<a  id="delButton" class="but-small" style="background-color: #A8A0A3;"><i class="fa fa-th-large"></i> 放弃</a>');
+				mapObj.addPopup(popup);
+	            popup.show();
+	            var delHtml =$(popup.contentDiv);
+		               
+	             delHtml.find("#delButton").unbind();
+	             delHtml.find("#delButton").bind("click",function(evt){
+	             		delFirstPoint();
+	             });
+			} else if (geometry.components[0].components.length==3) {
+				popup.destroy();
+			}
+		}
+		
+		
+		refLayer.removeAllFeatures();
+		//var features = mainWindow.onModify(point, geometry,routeLine,fencePolygon);
+		//refLayer.addFeatures(features);
+		/*
+		for (var i=0;i<3;i++){
+			var x = point.x+Math.random()*10-5;
+			var y = point.y+Math.random()*10-5;
+			var wkt = "LINESTRING(" + point.x + " " + point.y + "," + x + " " + y + ")";
+			var line = OpenLayers.Geometry.fromWKT(wkt);
+			var feature = new OpenLayers.Feature.Vector(line);
+			refLayer.addFeatures([feature]);
+		}
+		*/
+
+		var url = "http://10.80.8.204:8090/JYYW/DXLX.ashx?geometry="+point.x+","+point.y;
+		console.log(url);
+		var postData={
+			"event":"TRANS",
+			"extend":{"eventswitch":"search"},
+			"content":{"condition":{"url":url}}
+		};
+		//console.log(url);
+		var Loader = new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){
+			if (finished) {
+				finished = false;
+				return;
+			}
+			//alert(JSON.stringify(backJson));
+			var value = backJson['value'];
+			var status = $(value).find("Status").text();
+			if(status!="Success"){
+				return;
+			}
+			//alert(value);
+			var path = $(value).find("path");					
+			
+			for (var i=0;i<path.length;i++) {
+				var wkt = "LINESTRING(";
+				var pointStr = path[i].innerHTML;
+				var regS = new RegExp("</x><y>","g");
+				pointStr = pointStr.replace(regS," ");
+				var regS = new RegExp("</y></point><point><x>","g");
+				pointStr = pointStr.replace(regS,",");
+				var regS = new RegExp("<point><x>","g");
+				pointStr = pointStr.replace(regS,"");
+				var regS = new RegExp("</y></point>","g");
+				pointStr = pointStr.replace(regS,"");
+				
+				wkt += pointStr + ")";
+				//alert(wkt);
+				console.log(wkt);
+				var line = OpenLayers.Geometry.fromWKT(wkt);
+				var feature = new OpenLayers.Feature.Vector(line);
+				refLayer.addFeatures([feature]);
+			}
+		});
+		$(Loader).bind("SYS_ERROR",function(e,msg){
+			$.error("调用失败!");
+		});
+		Loader.POSTDATA("php/trans.php",postData);
+	}
+	
+	function onFinish(point, geometry) {
+		finished = true;
+		refLayer.removeAllFeatures();
+	}
+	
+	function addRouteLayer(){
+		/*
+		var stylemap = new OpenLayers.StyleMap({
+                "default": new OpenLayers.Style({
+				  	cursor: "pointer",
+					strokeColor:"#F00",
+					strokeWidth: 5,
+					fillColor:"#999999",
+					fillOpacity:0.5
+                }),
+                "select": new OpenLayers.Style({
+                  cursor: "pointer",
+				  strokeColor:"#9292f2",
+				  strokeWidth: 5,
+				  fillColor:"#0000ff",
+				  fillOpacity:0.2
+                })
+            });
+		*/
+		var eventListeners = {
+	           'featureselected':function(evt){
+	              var feature = evt.feature;
+	              openPopup(feature);
+	           },
+	           'featureunselected':function(evt){
+	               var feature = evt.feature;
+	               mapObj.removePopup(feature.popup);
+	               feature.popup.destroy();
+	               feature.popup = null;
+	           }
+	       }
+	    routeLayer = mapObj.getLayersByName("巡逻路线")[0];
+		routeLayer.events.on(eventListeners);
+	    //routeLayer = new OpenLayers.Layer.Vector('巡逻路线', {styleMap: stylemap, eventListeners: eventListeners});
+		/*设置警员初始化属性*/
+		routeLayer.setVisibility(false);
+		//mapObj.addLayer(routeLayer);
+		
+		routeLine = new OpenLayers.Control.DrawFeature(routeLayer, OpenLayers.Handler.Path,{ multi: true});
+		routeLine.events.on({"featureadded" : function(drawGeometryArgs){
+			finished = true;
+			//p.find("#drawPLbtn").removeClass("nowid"); //变正常
+			routeClick = true;
+			refLayer.removeAllFeatures();
+			//routeLine.deactivate();
+			var polyline = drawGeometryArgs.feature;
+			var path = polyline.geometry.components[0].components;
+			if(path.length==2&&path[0].x==path[1].x&&path[0].y==path[1].y){
+				movePadingPressed();
+				routeLayer.removeFeatures(polyline);
+				return;
+			}
+			polyline.path = path;
+			openPopup(polyline);	
+		}});
+	   mapObj.addControl(routeLine);
+	   
+	   return routeLayer;
+	}
+	
+	function addFenceLayer(){
+		var eventListeners = {
+	           'featureselected':function(evt){
+	              var feature = evt.feature;
+	              openFence(feature);
+	           },
+	           'featureunselected':function(evt){
+	               var feature = evt.feature;
+	               mapObj.removePopup(feature.popup);
+	               feature.popup.destroy();
+	               feature.popup = null;
+	           }
+	       }
+	    fenceLayer = mapObj.getLayersByName("勤务区域")[0];
+	    fenceLayer.events.on(eventListeners);
+		//fenceLayer = new OpenLayers.Layer.Vector("勤务区域",{eventListeners: eventListeners});
+		fenceLayer.setVisibility(false);
+		
+		//mapObj.addLayer(fenceLayer);
+		
+		fencePolygon = new OpenLayers.Control.DrawFeature(fenceLayer, OpenLayers.Handler.Polygon,{ multi: true});
+		fencePolygon.events.on({"featureadded" : function(drawGeometryArgs){
+			finished = true;
+			//p.find("#drawPRbtn").removeClass("nowid"); //变正常
+			fenceClick = true;
+			refLayer.removeAllFeatures();
+			//fencePolygon.deactivate();
+			var polygon = drawGeometryArgs.feature;
+			var path = polygon.geometry.components[0].components[0].components;
+			if(path.length==2&&path[0].x==path[1].x&&path[0].y==path[1].y){
+				movePadingPressed();
+				fenceLayer.removeFeatures(polygon);
+				return;
+			}
+			polygon.path = path;
+			openFence(polygon);	
+		}});
+		
+		mapObj.addControl(fencePolygon);
+		
+		return fenceLayer;
+	}
+	
+	this.loadFeatureData = function (){
+		var Loader=new AJAXObj();
+			$(Loader).bind("JSON_LOADED",function(e,backJson){	
+				var record = backJson["value"];
+			 	for (var i=0;i<record.length;i++) {
+			 		var type = record[i]['type'];
+			 		if(type=="1"){
+			 			addLine(record[i]);
+			 		}else if(type=="2"){
+			 			addPolygon(record[i]);
+			 		}
+			 	}
+						
+			})
+		Loader.POSTDATA("php/equip/GetFeature_web.php",{"event":"Feature","content":{"condition":{"orgCode":userData.orgCode}},"extend":{}});				
+			
+	}
+	
+	//打开巡逻路线详细信息窗口
+	function openPopup(ft) {
+		var html = '<div id="popupRouteContent" style="height:50px"><div id="routeForm"><table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab"><tr><th width="20%" align="right"><i>路线名称</i></th><td width="80%"><input type="text" name="featureName" id="featureName" class="must"  style="width:200px" /></td></tr><tr><td colspan="2" align="center"><a  id="routeSaveButton" class="but-small but-red"><i class="fa fa-save"></i> 保存</a> <a  id="routeCancelButton" class="but-small but-yellow"> <i class="fa fa-reply"></i> 删除</a></td></tr></table></div></div>';
+		ft = ft;
+		ft.type=1;
+		clearInfoWindow();
+		popup = new OpenLayers.Popup.FramedCloud("routePop", 
+			 ft.geometry.getBounds().getCenterLonLat(),
+			 null,
+			 html,
+			 null, false, function(){ 
+				refLayer.removeAllFeatures();
+				clearInfoWindow();
+				if(!ft.trafficInfo){
+					removeAllFeatures(routeLayer,ft);
+				}
+			});
+		ft.popup = popup;
+		mapObj.addPopup(popup);
+		var routeHtml =$(popup.contentDiv);
+		if(ft.trafficInfo){
+			routeHtml.find("#featureName").val(ft.trafficInfo.featureName);
+			//$("#featureName").val(ft.trafficInfo.featureName);
+		}
+
+		routeHtml.find("#routeCancelButton").unbind();
+		routeHtml.find("#routeCancelButton").bind("click",function(){ 
+			refLayer.removeAllFeatures();
+			clearInfoWindow();
+			if(!ft.trafficInfo){
+				removeAllFeatures(routeLayer,ft);
+			} else {
+				var params ={};
+				params['featureId']=ft.trafficInfo.featureId;
+				var Loader=new AJAXObj();
+				$(Loader).bind("JSON_LOADED",function(e,backJson){	
+					var result = backJson["head"]['code'];
+					if(result==1){
+						$.message("操作成功!");
+						clearInfoWindow();
+						removeAllFeatures(routeLayer,ft);
+					}
+							
+				})
+				Loader.POSTDATA("php/equip/DeleteFeature_web.php",{"event":"Feature","content":{"condition":params},"extend":{}});
+			}
+
+		});
+		routeHtml.find("#routeSaveButton").unbind();
+		routeHtml.find("#routeSaveButton").bind("click",function(){ 
+			var featureName = routeHtml.find("#featureName").val();
+			if(featureName==""){
+				$.error("名称不能为空!");
+				return;
+			}
+			var params ={};
+			var path = ft.geometry;
+			params['geometry']=path.toString();
+			params['featureName']=featureName;
+			params['type']="1";
+			params['featureId']=ft.trafficInfo ? ft.trafficInfo.featureId : '';
+			//params = JSON.stringify(params);
+			var Loader=new AJAXObj();
+			$(Loader).bind("JSON_LOADED",function(e,backJson){	
+				var result = backJson["head"]['code'];
+			  if(result==1){
+					$.message("操作成功!",2000);
+					clearInfoWindow();
+					if (ft.trafficInfo) {
+						var info = ft.trafficInfo;
+						info.featureName = featureName;
+						info.geometry = params['geometry'];
+						addLine(info);
+						removeAllFeatures(routeLayer,ft);
+					} else {
+						ft.trafficInfo = backJson["value"];
+					}
+				}
+						
+			})
+			Loader.POSTDATA("php/equip/UpdateOrAddDutyFeature_web.php",{"event":"Feature","content":{"condition":params},"extend":{}});				
+			
+		});
+		
+	}
+	
+	//打开电子围栏详细信息窗口
+	function openFence(ft) {
+		var html = '<div id="popupFenceContent" style="height:50px"><div id="fenceForm"><table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab"><tr><th width="20%" align="right"><i>区域名称</i></th><td width="80%"><input type="text" name="featureFenceName" id="featureFenceName" class="must"  style="width:200px" /></td></tr><tr><td colspan="2" align="center"><a  id="fenceSaveButton" class="but-small but-red"><i class="fa fa-save"></i> 保存</a> <a  id="fenceCancelButton" class="but-small but-yellow"> <i class="fa fa-reply"></i> 删除</a></td></tr></table></div></div>';
+		ft = ft;
+		ft.type=2;
+		clearInfoWindow();
+		popup = new OpenLayers.Popup.FramedCloud("fencePop", 
+			 ft.geometry.getBounds().getCenterLonLat(),
+			 null,
+			 html,
+			 null, false, function(){
+				refLayer.removeAllFeatures();
+				clearInfoWindow();
+				if(!ft.trafficInfo){
+					removeAllFeatures(fenceLayer,ft);
+				}
+			});
+		ft.popup = popup;
+		mapObj.addPopup(popup);
+		var fenceHtml =$(popup.contentDiv);
+		if(ft.trafficInfo){
+			fenceHtml.find("#featureFenceName").val(ft.trafficInfo.featureName);
+		}
+
+		fenceHtml.find("#fenceCancelButton").unbind();
+		fenceHtml.find("#fenceCancelButton").bind("click",function(){ 
+			refLayer.removeAllFeatures();
+			clearInfoWindow();
+			if(!ft.trafficInfo){
+				removeAllFeatures(fenceLayer,ft);
+			} else {
+				var params ={};
+				params['featureId']=ft.trafficInfo.featureId;
+				var Loader=new AJAXObj();
+				$(Loader).bind("JSON_LOADED",function(e,backJson){	
+					var result = backJson["head"]['code'];
+					if(result==1){
+						$.message("操作成功!");
+						clearInfoWindow();
+						removeAllFeatures(fenceLayer,ft);
+					}
+							
+				})
+				Loader.POSTDATA("php/equip/DeleteFeature_web.php",{"event":"Feature","content":{"condition":params},"extend":{}});
+			}
+		});
+		fenceHtml.find("#fenceSaveButton").unbind();
+		fenceHtml.find("#fenceSaveButton").bind("click",function(){ 
+			var featureName = fenceHtml.find("#featureFenceName").val();
+			if(featureName==""){
+				$.error("名称不能为空!");
+				return;
+			}
+			var params ={};
+			var path = ft.geometry;
+			params['geometry']=path.toString();
+			params['featureName']=featureName;
+			params['type']="2";
+			params['featureId']=ft.trafficInfo ? ft.trafficInfo.featureId : '';
+			//params = JSON.stringify(params);
+			var Loader=new AJAXObj();
+			$(Loader).bind("JSON_LOADED",function(e,backJson){	
+				var result = backJson["head"]['code'];
+			  if(result==1){
+					$.message("操作成功!");
+					clearInfoWindow();
+					if (ft.trafficInfo) {
+						var info = ft.trafficInfo;
+						info.featureName = featureName;
+						info.geometry = params['geometry'];
+						addPolygon(info);
+						removeAllFeatures(fenceLayer,ft);
+					} else {
+						ft.trafficInfo = backJson["value"];
+					}
+				}
+						
+			})
+			Loader.POSTDATA("php/equip/UpdateOrAddDutyFeature_web.php",{"event":"Feature","content":{"condition":params},"extend":{}});				
+			
+		});
+		
+	}
+	
+	function onFeatureUnselect(feature) {
+		if(feature.popup){
+            mapObj.removePopup(feature.popup);
+            feature.popup.destroy();
+            feature.popup = null;
+		}
+    }
+    
+    /*添加巡逻路线*/
+    function drawRouteWindow(ft){
+    	repeatAllBut();
+		if (currentTool != 'drawPLbtn') {
+			routeLayer.setVisibility(true);
+			routeLine.activate();
+			p.find("#drawPLbtn").addClass("nowid"); //变选中
+			routeLine.handler.callbacks = OpenLayers.Util.extend(
+				{
+					point: onModify,
+					done: onFinish
+				},
+				routeLine.handler.callbacks
+			);
+			currentTool = 'drawPLbtn';
+		} else {
+			currentTool = '';
+		}
+
+    	/*if(routeClick){
+			routeLayer.setVisibility(true);
+			routeLine.activate();
+			p.find("#drawPLbtn").addClass("nowid"); //变选中
+			routeLine.handler.callbacks = OpenLayers.Util.extend(
+				{
+					point: onModify,
+					done: onFinish
+				},
+				routeLine.handler.callbacks
+			);
+			routeClick = false;
+		}else{
+			p.find("#drawPLbtn").removeClass("nowid"); //变正常
+			refLayer.removeAllFeatures();
+			routeLine.deactivate();
+			routeClick = true;
+		}*/
+	}
+	
+	/*添加电子围栏*/
+	function drawFenceWindow(ft){
+		repeatAllBut();
+		if (currentTool != 'drawPRbtn') {
+			fenceLayer.setVisibility(true);
+			fencePolygon.activate();
+			p.find("#drawPRbtn").addClass("nowid"); //变选中
+			fencePolygon.handler.callbacks = OpenLayers.Util.extend(
+				{
+					point: onModify,
+					done: onFinish
+				},
+				fencePolygon.handler.callbacks
+			);
+			currentTool = 'drawPRbtn';
+		} else {
+			currentTool = '';
+		}
+		/*if(fenceClick){
+			fenceLayer.setVisibility(true);
+			fencePolygon.activate();
+			p.find("#drawPRbtn").addClass("nowid"); //变选中
+			fencePolygon.handler.callbacks = OpenLayers.Util.extend(
+				{
+					point: onModify,
+					done: onFinish
+				},
+				fencePolygon.handler.callbacks
+			);
+			fenceClick = false;
+		}else{
+			p.find("#drawPRbtn").removeClass("nowid"); //变正常
+			refLayer.removeAllFeatures();
+			fencePolygon.deactivate();
+			fenceClick = true;
+		}*/
+	}
+	
+	/**
+	 * addLine
+	 * 添加线覆盖物
+	 * 添加巡逻路线
+	 *trafficInfo:巡逻路线store对象
+	 */
+	function addLine(trafficInfo) {
+		//解析点队列
+		var lineArr = new Array();
+		var myStyles = new OpenLayers.StyleMap({
+                "default": new OpenLayers.Style({
+				  	cursor: "pointer",
+					strokeColor:"#F00",
+					strokeWidth: 5,
+					fillColor:"#999999",
+					fillOpacity:0.5
+                }),
+                "select": new OpenLayers.Style({
+                  cursor: "pointer",
+				  strokeColor:"#9292f2",
+				  strokeWidth: 5,
+				  fillColor:"#0000ff",
+				  fillOpacity:0.2
+                })
+            });
+		var polyline = null;
+		polyline = OpenLayers.Geometry.fromWKT(trafficInfo.geometry);
+		var featureLine = new OpenLayers.Feature.Vector();
+			featureLine.geometry = polyline;
+		
+		routeLayer.styleMap= myStyles;
+		featureLine.trafficInfo = trafficInfo;
+		routeLayer.addFeatures(featureLine);
+		return polyline;
+	}
+	
+	/**
+	 * addLine
+	 * 添加线覆盖物
+	 * 添加巡逻路线
+	 *trafficInfo:巡逻路线store对象
+	 */
+	function addPolygon(trafficInfo) {
+		//解析点队列
+		var lineArr = new Array();
+		var polyline = null;
+		polyline = OpenLayers.Geometry.fromWKT(trafficInfo.geometry);
+		var featureLine = new OpenLayers.Feature.Vector();
+			featureLine.geometry = polyline;
+		
+		featureLine.trafficInfo = trafficInfo;
+		fenceLayer.addFeatures(featureLine);
+		
+		return polyline;
+	}
+	
+	/*清除所有popup*/
+	function clearInfoWindow(){
+		//selectFeature.unselectAll();
+		var popArr = mapObj.popups;
+		var layerArr = mapObj.layers;
+		for (var i=0;i<popArr.length;i++){
+			mapObj.removePopup(popArr[i]);
+		}
+		/*
+		for(var i=0;i<layerArr.length;i++){
+			var featureArr = layerArr[i].features;
+			if(featureArr){
+				for(var j=0;j<featureArr.length;j++){
+					if(featureArr[j].popup){
+					featureArr[j].popup.destroy();
+					featureArr[j].popup = null;
+					}
+				}
+			}
+		}
+		*/
+	}
+	
+	/*清除相对应的feature*/
+	function removeAllFeatures(vector,geometry){
+		var vectors = new Array();
+		vectors.push(geometry);
+		vector.removeFeatures(vectors);
+	}
+	
+	function orgVectorClick(){
+		repeatAllBut();
+		if (currentTool != '#selectMRbtn') {
+			var click = mainWindow.click;
+			if(click){
+				click.activate();
+				p.find("#selectMRbtn").addClass("nowid"); //变选中
+			}
+			currentTool = '#selectMRbtn';
+		} else {
+			currentTool = '';
+		}
+		/*if(isClick){
+			var click = mainWindow.click;
+			if(click){
+				click.activate();
+				isClick = false;
+				p.find("#selectMRbtn").addClass("nowid"); //变选中
+			}
+		}else{
+			var orgVectorLayer = mapObj.getLayersByName("辖区高亮图层")[0];
+			orgVectorLayer.removeAllFeatures();
+			var click = mainWindow.click;
+			click.deactivate();
+			isClick = true;
+			p.find("#selectMRbtn").removeClass("nowid"); //变正常
+		}*/
+	}
+	
+	function repeatAllBut(){
+		p.find("#selectbtn").removeClass("nowid");
+
+		mapTool.clearAllFeatures();
+
+		mapTool.rectangleControl.deactivate();
+		p.find("#selectBoxbtn").removeClass("nowid");
+
+		mapTool.circleControl.deactivate();
+		p.find("#selectCirclebtn").removeClass("nowid");
+
+		mapTool.polygonControl.deactivate();
+		p.find("#selectPolygonbtn").removeClass("nowid");
+		
+		//routeLine.deactivate();
+		//p.find("#drawPLbtn").removeClass("nowid"); //变正常
+		
+		//fencePolygon.deactivate();
+    	//p.find("#drawPRbtn").removeClass("nowid"); //变正常
+		
+		mrDrawCtl.deactivate();
+    	p.find("#drawMRbtn").removeClass("nowid"); //变正常
+    	
+		var click = mainWindow.click;
+		click.deactivate();
+		p.find("#selectMRbtn").removeClass("nowid"); //变正常
+		
+		var jzwControl = mainWindow.jzwControl;
+		jzwControl.deactivate();
+		p.find("#selectJZWbtn").removeClass("nowid"); //变正常
+    	
+		var orgVectorLayer = mapObj.getLayersByName("辖区高亮图层")[0];
+		orgVectorLayer.removeAllFeatures();
+		
+		var jzwPointLayer = mapObj.getLayersByName("建筑物点临时图层")[0];
+		var jzwPolygonLayer = mapObj.getLayersByName("建筑物面临时图层")[0];
+		jzwPolygonLayer.removeAllFeatures();
+		jzwPointLayer.removeAllFeatures();
+		clearInfoWindow();
+		
+		refLayer.removeAllFeatures();
+	}
+	
+	function clearFeatureClick(){
+		var layer = mapObj.getLayersByName("摄像头")[0];
+		layer.removeAllFeatures();
+		layer.addFeatures(mainWindow.cameraFeatures);
+		layer.setVisibility(false);
+//		if (mapObj.zoom>6&&layer.getVisibility()) {
+//				layer.setVisibility(true);
+//		}else{
+//				layer.setVisibility(false);
+//		}
+		
+		var ljfxlayer = mapObj.getLayersByName("路径分析")[0];
+		ljfxlayer.removeAllFeatures();
+		var fenceLayer = mapObj.getLayersByName("勤务区域")[0];
+		fenceLayer.removeAllFeatures();
+		
+	}
+	
+	function openAwindow(){
+		switch($(this).attr("id")){
+				case "drawPLbtn":
+					//drawRouteWindow();
+					break;
+				case "drawPRbtn":
+					//drawFenceWindow();
+					break;
+				case "selectMRbtn":
+					orgVectorClick();
+					break;
+				case "num4":
+					clearFeatureClick();
+					break;
+				case "selectBoxbtn":
+					selectBoxBtnClick();
+					break;
+				case "selectCirclebtn":
+					selectCircleBtnClick();
+					break;
+				case "selectPolygonbtn":
+					selectPolygonBtnClick();
+					break;
+				case "drawMRbtn":
+					drawManagerRegion();
+					break;
+				case "selectJZWbtn":
+					selectJZWClick();
+					break;
+		}
+	}
+	
+	function selectJZWClick(){
+		repeatAllBut();
+		if (currentTool != '#selectJZWbtn') {
+			var jzwControl = mainWindow.jzwControl;
+			if(jzwControl){
+				jzwControl.activate();
+				p.find("#selectJZWbtn").addClass("nowid"); //变选中
+			}
+			currentTool = '#selectJZWbtn';
+		} else {
+			currentTool = '';
+		}
+	}
+
+	function selectBoxBtnClick() {
+		repeatAllBut();
+		if (currentTool != 'selectBoxbtn') {
+			p.find("#selectbtn").addClass("nowid");
+			p.find("#selectBoxbtn").addClass("nowid");
+			mapTool.rectangleControl.activate();
+			currentTool = 'selectBoxbtn';
+		} else {
+			currentTool = '';
+		}
+	}
+
+	function selectCircleBtnClick() {
+		repeatAllBut();
+		if (currentTool != 'selectCirclebtn') {
+			p.find("#selectbtn").addClass("nowid");
+			p.find("#selectCirclebtn").addClass("nowid");
+			mapTool.circleControl.activate();
+			currentTool = 'selectCirclebtn';
+		} else {
+			currentTool = '';
+		}
+	}
+
+	function selectPolygonBtnClick() {
+		repeatAllBut();
+		if (currentTool != 'selectPolygonbtn') {
+			p.find("#selectbtn").addClass("nowid");
+			p.find("#selectPolygonbtn").addClass("nowid");
+			mapTool.polygonControl.activate();
+			currentTool = 'selectPolygonbtn';
+		} else {
+			currentTool = '';
+		}
+	}
+	
+	/******************************************************责任区******************************************************/
+	var mrEnabled = false;
+	var mrLayer = null;
+	var mrDrawCtl = null;
+	var finished = false;
+	var currentTool = '';
+	function addMrLayer(){
+		var stylemap = new OpenLayers.StyleMap({
+                "default": new OpenLayers.Style({
+				  	cursor: "pointer",
+					strokeColor:"#8A8A8A",
+					strokeWidth: 5,
+					fillColor:"#FFEC8B",
+					fillOpacity:0.5
+                }),
+                "select": new OpenLayers.Style({
+                  cursor: "pointer",
+				  strokeColor:"#9292f2",
+				  strokeWidth: 5,
+				  fillColor:"#0000ff",
+				  fillOpacity:0.2
+                })
+            });
+		
+		var eventListeners = {
+	           'featureselected':function(evt){
+	              var feature = evt.feature;
+	              openMrPopup(feature);
+	           },
+	           'featureunselected':function(evt){
+	               var feature = evt.feature;
+	               mapObj.removePopup(feature.popup);
+	               feature.popup.destroy();
+	               feature.popup = null;
+	           }
+	       }
+	    mrLayer = mapObj.getLayersByName("巡逻区域")[0];
+		mrLayer.events.on(eventListeners);
+	    //mrLayer = new OpenLayers.Layer.Vector('动态责任区', {styleMap: stylemap, eventListeners: eventListeners});
+		/*设置警员初始化属性*/
+		mrLayer.setVisibility(false);
+		//mapObj.addLayer(mrLayer);
+		
+		mrDrawCtl = new OpenLayers.Control.DrawFeature(mrLayer, OpenLayers.Handler.Polygon,{ multi: true});
+		mrDrawCtl.events.on({"featureadded" : function(drawGeometryArgs){
+			finished = true;
+			//p.find("#drawPLbtn").removeClass("nowid"); //变正常
+			//mrClick = true;
+			refLayer.removeAllFeatures();
+			//routeLine.deactivate();
+			var ft = drawGeometryArgs.feature;
+			var path = ft.geometry.components[0].components;
+			if(path.length==2&&path[0].x==path[1].x&&path[0].y==path[1].y){
+				movePadingPressed();
+				mrLayer.removeFeatures(ft);
+				return;
+			}
+			ft.path = path;
+			openMrPopup(ft);	
+		}});
+	   mapObj.addControl(mrDrawCtl);
+	   
+	   return mrDrawCtl;
+	}
+
+	/*画责任区按钮事件*/
+    function drawManagerRegion(){
+    	repeatAllBut();
+		if (currentTool != 'drawMRbtn') {
+			mrLayer.setVisibility(true);
+			mrDrawCtl.activate();
+			p.find("#drawMRbtn").addClass("nowid"); //变选中
+			mrDrawCtl.handler.callbacks = OpenLayers.Util.extend(
+				{
+					point: onModify,
+					done: onFinish
+				},
+				mrDrawCtl.handler.callbacks
+			);
+			currentTool = 'drawMRbtn';
+		} else {
+			currentTool = '';
+		}
+    	/*if(!mrEnabled){
+			mrLayer.setVisibility(true);
+			mrDrawCtl.activate();
+			p.find("#drawMRbtn").addClass("nowid"); //变选中
+			mrDrawCtl.handler.callbacks = OpenLayers.Util.extend(
+				{
+					point: onModify,
+					done: onFinish
+				},
+				mrDrawCtl.handler.callbacks
+			);
+			mrEnabled = true;
+		}else{
+			//mrLayer.setVisibility(false);
+			mrDrawCtl.deactivate();
+			p.find("#drawMRbtn").removeClass("nowid"); //变正常
+			refLayer.removeAllFeatures();
+			mrEnabled = false;
+		}*/
+	}
+
+	/*加载责任区数据*/
+	this.loadMrData = function (){
+		var Loader=new AJAXObj();
+			$(Loader).bind("JSON_LOADED",function(e,backJson){	
+				var record = backJson["value"];
+			 	for (var i=0;i<record.length;i++) {
+			 		//alert(record[i]['name']);
+					parseMrData(record[i]);
+			 	}
+			})
+		Loader.POSTDATA("php/layer/ManageRegionOra.php",{"event":"Feature","content":{"condition":{"method":"select"}},"extend":{}});					
+	}
+
+	/*解析责任区数据*/
+	function parseMrData(object) {
+		if (object.wkt=="" || object.wkt==null) {
+			return;
+		}
+		var lineArr = new Array();
+		var geometry = OpenLayers.Geometry.fromWKT(object.wkt);
+		var feature = new OpenLayers.Feature.Vector();
+		feature.geometry = geometry;
+		feature.info = object;
+		mrLayer.addFeatures(feature);
+		
+		return feature;
+	}
+
+	/*打开责任区详细信息窗口*/
+	function openMrPopup(ft) {
+		debugger;
+		var html = "";
+		//var html = '<div id="popupMrContent" style="height:50px"><div id="mrForm"><table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab"><tr><th width="20%" align="right"><i>责任区名称</i></th><td width="80%"><input type="text" name="mrName" id="mrName" class="must"  style="width:200px" /></td></tr><tr><th width="20%" align="right"><i>管辖单位</i></th><td width="80%"><input type="text" name="mrDeptid" id="mrDeptid" class="fm_popOutSelect"  style="width:200px" /></td></tr><tr><td colspan="2" align="center"><a  id="mrSaveButton" class="but-small but-red"><i class="fa fa-save"></i> 保存</a> <a  id="mrCancelButton" class="but-small but-yellow"> <i class="fa fa-reply"></i> 删除</a></td></tr></table></div></div>';
+		if(isDisplay){
+			if(ft.info){
+				html = '<div id="popupMrContent" style="height:50px"><div id="mrForm"><table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab"><tr><th width="20%" align="right"><i>责任区名称</i></th><td width="80%"><input type="text" name="mrName" id="mrName" class="must"  style="width:200px" /></td></tr><tr><th width="20%" align="right"><i>辖区编码</i></th><td width="80%"><input type="text" name="code" id="code" class="must"  style="width:200px" /></td></tr><tr><th width="20%" align="right"><i>管辖单位</i></th><td width="80%"><input type="text" name="mrDeptid" id="mrDeptid" class="fm_popOutSelect"  style="width:200px" /></td></tr><tr><td colspan="2" align="center"><a  id="mrSaveButton" class="but-small but-red"><i class="fa fa-save"></i> 保存</a> <a  id="mrCancelButton" class="but-small but-yellow"> <i class="fa fa-reply"></i> 删除</a><a  id="searchButton" class="but-small but-red"><i class="fa fa-search"></i> 辖区资源</a></td></tr></table></div></div>';
+			}else{
+				html = '<div id="popupMrContent" style="height:50px"><div id="mrForm"><table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab"><tr><th width="20%" align="right"><i>责任区名称</i></th><td width="80%"><input type="text" name="mrName" id="mrName" class="must"  style="width:200px" /></td></tr><tr><th width="20%" align="right"><i>辖区编码</i></th><td width="80%"><input type="text" name="code" id="code" class="must"  style="width:200px" /></td></tr><tr><th width="20%" align="right"><i>管辖单位</i></th><td width="80%"><input type="text" name="mrDeptid" id="mrDeptid" class="fm_popOutSelect"  style="width:200px" /></td></tr><tr><td colspan="2" align="center"><a  id="mrSaveButton" class="but-small but-red"><i class="fa fa-save"></i> 保存</a> <a  id="mrCancelButton" class="but-small but-yellow"> <i class="fa fa-reply"></i> 删除</a></td></tr></table></div></div>';
+			}
+		}else{
+			if(ft.info){
+				html = '<div id="popupMrContent" style="height:50px"><div id="mrForm"><table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab"><tr><th width="20%" align="right"><i>责任区名称</i></th><td width="80%"><input type="text" name="mrName" id="mrName" class="must"  style="width:200px" /></td></tr><tr><th width="20%" align="right"><i>辖区编码</i></th><td width="80%"><input type="text" name="code" id="code" class="must"  style="width:200px" /></td></tr><tr><th width="20%" align="right"><i>管辖单位</i></th><td width="80%"><input type="text" name="mrDeptid" id="mrDeptid" class="fm_popOutSelect"  style="width:200px" /></td></tr><tr><td colspan="2" align="center"><a  id="searchButton" class="but-small but-red"><i class="fa fa-search"></i> 辖区资源</a></td></tr></table></div></div>';
+			}else{
+				html = '<div id="popupMrContent" style="height:50px"><div id="mrForm"><table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab"><tr><th width="20%" align="right"><i>责任区名称</i></th><td width="80%"><input type="text" name="mrName" id="mrName" class="must"  style="width:200px" /></td></tr><tr><th width="20%" align="right"><i>辖区编码</i></th><td width="80%"><input type="text" name="code" id="code" class="must"  style="width:200px" /></td></tr><tr><th width="20%" align="right"><i>管辖单位</i></th><td width="80%"><input type="text" name="mrDeptid" id="mrDeptid" class="fm_popOutSelect"  style="width:200px" /></td></tr></table></div></div>';
+			}
+		}
+		ft.type=1;
+		clearInfoWindow();
+		popup = new OpenLayers.Popup.FramedCloud("mrPop", 
+			 ft.geometry.getBounds().getCenterLonLat(),
+			 null,
+			 html,
+			 null, false, function(){
+				refLayer.removeAllFeatures();
+				clearInfoWindow();
+				if(!ft.info){
+					removeAllFeatures(mrLayer,ft);
+				}
+			});
+		ft.popup = popup;
+		mapObj.addPopup(popup);
+		var mrHtml =$(popup.contentDiv);
+		if(ft.info){
+			mrHtml.find("#mrName").val(ft.info.name);
+			mrHtml.find("#code").val(ft.info.code);
+			mrHtml.find("#mrDeptid").val(ft.info.deptname);
+		}
+
+		var deptid = ft.info?ft.info['deptid']:"";
+		
+		mrHtml.find("#mrDeptid").unbind();
+		mrHtml.find("#mrDeptid").bind("click",function(){ 
+			var inputobj=mrHtml.find("#mrDeptid");
+			var option={"name":"部门过滤","url":"pages/treeSelector_NoCascade_MR.html","width":600,"height":400,"lock":true,"mulit":true};
+			option["callback"]=function(values){
+				inputobj.val(values["text"]);
+				deptid = values["value"];
+			};
+			WINDOW.open(option,null,null);
+		});
+
+		mrHtml.find("#mrCancelButton").unbind();
+		mrHtml.find("#mrCancelButton").bind("click",function(){ 
+			refLayer.removeAllFeatures();
+			clearInfoWindow();
+			if(!ft.info){
+				removeAllFeatures(mrLayer,ft);
+			} else {
+				var params ={};
+				params['method']='delete';
+				params['id']=ft.info.id;
+				var Loader=new AJAXObj();
+				$(Loader).bind("JSON_LOADED",function(e,backJson){	
+					var result = backJson["head"]['code'];
+					if(result==1){
+						$.message("操作成功!");
+						clearInfoWindow();
+						removeAllFeatures(mrLayer,ft);
+					}
+							
+				})
+				Loader.POSTDATA("php/layer/ManageRegionOra.php",{"event":"Feature","content":{"condition":params},"extend":{}});
+			}
+
+		});
+		mrHtml.find("#mrSaveButton").unbind();
+		mrHtml.find("#mrSaveButton").bind("click",function(){ 
+			var name = mrHtml.find("#mrName").val();
+			if(name==""){
+				$.error("名称不能为空!");
+				return;
+			}
+			var deptname = mrHtml.find("#mrDeptid").val();
+			if(deptid==""){
+				$.error("派出所编号不能为空!");
+				return;
+			}
+			var code = mrHtml.find("#code").val();
+			if(code==""){
+				$.error("辖区编码不能为空!");
+				return;
+			}
+			var params ={};
+			params['method']=ft.info ? 'update' : 'insert';
+			params['id']=ft.info ? ft.info.id : '';
+			params['name']=name;
+			params['code']=code;
+			params['type']="1";
+			params['deptid']=deptid;
+			params['deptname']=deptname;
+			params['wkt']=ft.geometry.toString();
+
+			//console.log(name + '||' + deptid + '||' + params['geometry']);
+			
+			var Loader=new AJAXObj();
+			$(Loader).bind("JSON_LOADED",function(e,backJson){	
+				var result = backJson["head"]['code'];
+				if(result==1){
+					$.message("操作成功!");
+					clearInfoWindow();
+					if (ft.info) {
+						var info = ft.info;
+						info.name = name;
+						info.code = code;
+						info.deptid = deptid;
+						info.deptname = deptname;
+						info.wkt = params['wkt'];
+						parseMrData(info);
+						removeAllFeatures(mrLayer,ft);
+					} else {
+						ft.info = backJson["value"];
+					}
+				}
+						
+			})
+			Loader.POSTDATA("php/layer/ManageRegionOra.php",{"event":"Feature","content":{"condition":params},"extend":{}});
+		});
+
+		 mrHtml.find("#searchButton").unbind();
+		 mrHtml.find("#searchButton").bind("click",function(evt){
+				feature = ft;
+				var action = WINDOW.getActionById(p.WINID+"_searchMapGrid");
+				if(action){
+					action.CONDITION["feature"]= feature;
+					WINDOW.reload(p.WINID+"_searchMapGrid");
+					//action.loadCameraData(cameraRound,circleFeature);
+				}else{
+					WINDOW.open({"name":p.WINID+"_searchMapGrid","width":550,"height":450,"url":"pages/zhdd/polygonSearch.html","title":"资源列表",'side':'right','fitscreen':true,'position':'right_top'},{"feature":feature},mrHtml.find("#searchButton"));
+				}
+				mapObj.removePopup(popup);
+				popup.destroy();
+				popup = null;
+		 });
+		
+	}
+}
+</script>
+<style type="text/css">
+.dropToolBar .toolbuts  a{
+	background-image: url(images/mapico.png);
+	background-repeat: no-repeat;	
+}
+.dropToolBar .toolbuts  a.but_1{
+	background-position: center -56px;	
+}
+.dropToolBar .toolbuts div.but_2{
+	background-image: url(images/mapico.png);
+	background-repeat: no-repeat;
+	background-position: center -170px;	
+}
+.dropToolBar .toolbuts  a.but_3{
+	background-position: center 1px;	
+}
+.dropToolBar .toolbuts  a.but_4{
+	background-position: center -86px;	
+}
+.dropToolBar .toolbuts a.but_5{
+	background-position: center -113px;	
+}
+.dropToolBar .toolbuts  a.but_6{
+	background-position: center -141px;	
+}
+.dropToolBar .toolbuts  a.but_7{
+	background-position: center -28px;	
+}
+.dropToolBar .toolbuts  a.but_8{
+	background-image: none;
+}
+.dropToolBar .toolbuts  a.but_9{
+	background-position: center -197px;
+}
+.dropToolBar .toolbuts  a.closebut{
+	background-image: none;
+	margin: 0px;
+	padding: 0px;
+}
+</style>
+
+<div class="dropToolBar">
+<!--  <div class="bumenfilter"><i class="fa fa-chevron-circle-down"></i><span>部门过滤</span><input name="bumenfilter" type="hidden" value="" /></div>-->
+<div class="toolbuts">
+<div class="iconbot but_2  fm_anydroplist" data-option="{'dropid':'selecticon','action':'mouseenter','hidebyclick':true}" id="selectbtn">    
+    <div class="fm_dropdiv toolsDropList" id="selecticon">
+        <a class="but_4" id="selectBoxbtn"></a>
+        <a class="but_5" id="selectCirclebtn"></a>
+        <a class="but_6" id="selectPolygonbtn"></a>
+    </div>
+</div>
+<!-- <a class="but_3" id="drawPLbtn" title="巡逻路线"></a>  -->
+<!-- <a class="but_7" id="drawPRbtn" title="巡逻区域"></a>  -->
+<a style="display: none;" class="but_9" id="drawMRbtn" title="绘制责任区"></a>
+<a class="but_1" id="selectMRbtn" title="辖区高亮"></a>
+<a class="but_1" id="selectJZWbtn" title="查询建筑物"></a>
+<a class="but_4" id="num4" title="清除"><i class="fa fa-rotate-left"></i></a>
+<a class="but_8" id="alarmsound"><i class="fa fa-volume-up"></i></a>
+<a class="closebut"><i class="fa fa-chevron-up"></i></a>
+</div>
+ <div class="topSearchBox"></div>  
+</div>

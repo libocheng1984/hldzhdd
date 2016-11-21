@@ -1,0 +1,233 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		p.find(".formBox").height(p.WRAPER.height()-p.find(".submitButs").outerHeight(true));
+	}
+	
+	//表单对象
+	var SubmitForm;
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+		
+		//表单例子------------------------------------------
+		
+		//表单格式化处理
+		SubmitForm=new formDeal(p.find("#Form"));
+		$(SubmitForm).one("HTML_FORMATED",getFormData);//绑定格式化完成事件，执行下一步
+		SubmitForm.parse();	
+		
+		//表单组件例子------------------------------------------
+		
+		//禁止日期例子
+		p.find(".disabledDate").bind("click",function(){			
+			p.find("[name=starttime]").disable(true);				
+		})
+		
+		//停用日期例子
+		p.find(".readonlyDate").bind("click",function(){	
+			p.find("[name=endtime]").readonly(true);				
+		})
+		
+		//禁止上传例子
+		p.find(".disabledUpload").bind("click",function(){
+			p.find(".fm_uploadFile").eq(0).disable();
+		})
+		
+		//禁止下拉例子
+		p.find(".disabledSelect").bind("click",function(){			
+			p.find("[name=language]").disable(true);				
+		})
+		
+		//禁止下拉例子
+		p.find(".disabledSelect").bind("click",function(){			
+			p.find("[name=language]").disable(true);				
+		})
+		
+		//解开下拉例子
+		p.find(".enableSelect").bind("click",function(){
+			//脚本赋值
+			p.find("[name=kaifa]").changeValue("python");
+			//解下拉
+			p.find("[name=kaifa]").disable(false);				
+		})		
+		
+		//停用下拉
+		p.find(".readonlySelect").bind("click",function(){			
+			p.find("[name=language2]").readonly(true);				
+		})
+		
+		//改变下拉选项
+		p.find(".changeSelect").bind("click",function(){
+			p.find("[name=kaifa]").changeOption([
+			{"value":"ass","text":"New Option 1"},{"value":"ass2","text":"New Option 2"},{"value":"ass3","text":"New Option 3"}
+			]);	
+			
+			//脚本赋值
+			p.find("[name=kaifa]").changeValue("ass2");		
+		});
+		
+		//禁止checkBox
+		p.find(".disabledCheck").bind("click",function(){
+			//脚本赋值
+			p.find("[name=checkbox]:eq(3)").checked();
+			//禁用
+			p.find("[name=checkbox]").disable();			
+		})
+		
+		//停止radio
+		p.find(".readonlyRadio").bind("click",function(){
+			//脚本赋值
+			//p.find("[name=radio]:eq(2)").checked();
+			p.find("[name=radio]").changeValue("4");	
+			//停用
+			p.find("[name=radio]").readonly();			
+		})
+		
+		//表单组件例子------------------------------------------
+		
+		//更新一下尺寸
+		p.resize();	
+	}
+	
+	//编辑状态，获取数据
+	function getFormData(){ 
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){			
+			SubmitForm.bindData(backJson["value"]);//绑定数据		
+			p.find("#saveButton").bind("click",SaveForm);			
+		})
+		Loader.POSTDATA("/host/form.asp",{"event":"FormEdit","content":{"condition":p.CONDITION},"extend":{}});				
+		p.find("#cancelButton").bind("click",function(){ 
+			WINDOW.	close(p.WINID);//关闭窗口
+		});
+	}
+	
+	//提交保存
+	function SaveForm(){
+		if(SubmitForm.check()){ //数据校验
+			//保存失败
+			var errorBack=function(e){				
+				p.find("#saveButton").removeClass("disable");//解按钮
+			}	
+			//保存成功
+			var saveResult=function(e,BackJson){
+				$.message("保存成功！",2000);
+				var parentWindow=WINDOW.getActionById(p.CONDITION["parentid"]);//通过窗体ID找到窗体对象（ACTION）
+				parentWindow.refesh(); //执行父窗体方法
+				WINDOW.	close(p.WINID);//关闭窗口
+			}
+			//获取表单数据
+			formData=SubmitForm.getData();
+			p.find("#saveButton").addClass("disable");//锁按钮			
+			var postData={"event":"saveForm",
+									"extend":{"eventswitch":"save"},
+									"content":{"condition":p.CONDITION,"value":formData}
+									};		
+			var Loader=new AJAXObj();
+			$(Loader).unbind().one("JSON_LOADED",saveResult).one("SYS_ERROR",errorBack);			
+			Loader.POSTDATA("/host/form.asp",postData);
+		}
+	}
+}
+</script>
+<!--内容部分start-->
+<!--表单-->
+
+<div class="formBox">
+  <form id="Form">
+    <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab">
+      <tr>
+        <th width="120" align="right"><i>开始时间</i></th>
+        <td><input style="width:200px"  class="fm_dateinput"  value="2014-05-31"  data-option="{'data':'y,m,d','force2':true}"  name="starttime" type="text" />
+          <a class="disabledDate  but-small but-yellow">禁用disable</a></td>
+      </tr>
+      <tr>
+        <th align="right"><i>结束时间</i></th>
+        <td><input style="width:200px"   class="fm_dateinput"  value="2014-05-31"  data-option="{'data':'y,m,d','force2':true}"  name="endtime" type="text" />
+          <a class="readonlyDate  but-small but-yellow">停用readonly</a></td>
+      </tr>
+      <tr>
+        <th align="right"><i>开发语言</i></th>
+        <td><select  style="width:200px" name="kaifa" disabled="disabled">
+            <option value="java">Java</option>
+            <option value="c">C</option>
+            <option value="basic">Basic</option>
+            <option value="perl">Perl</option>
+            <option value="python">Python</option>
+          </select>
+          <a class="enableSelect but-small but-yellow">启用disable</a> <a class="changeSelect but-small but-greenlight">改选项</a></td>
+      </tr>
+      <tr>
+        <th align="right"><i>开发部门</i></th>
+        <td><select  name="language" style="width:200px" data-option="{'url':'host/listdata.asp','param':{'guid':'123456'},'mulit':true}" />
+          
+          <a class="disabledSelect  but-small but-yellow">禁用disable</a></td>
+      </tr>
+      <tr>
+        <th align="right"><i>姓名</i></th>
+        <td><input name="name"  type="text" class="must" style="width:200px" readonly="readonly" /></td>
+      </tr>
+      <tr>
+        <th align="right"><i>下拉文本</i></th>
+        <td><select  name="language2" style="width:200px" data-option="{'url':'host/listdata.asp','param':{'guid':'123456'},'inputable':true}" />
+          
+          <a class="readonlySelect but-small but-yellow">停用readonly</a></td>
+      </tr>
+      <tr>
+        <th align="right"><i>身份证</i></th>
+        <td><input  type="text" name="idno"  style="width:200px" title="18位"/></td>
+      </tr>
+      <tr>
+        <th align="right"><em>多选</em></th>
+        <td><input  type="checkbox" name="checkbox"  data-option="{'url':'host/listdata.asp','param':{'guid':'123456'}}"/>
+          <a class="disabledCheck  but-small but-yellow">禁用disable</a></td>
+      </tr>
+      <tr>
+        <th align="right"><em>单选</em></th>
+        <td><input  type="radio" name="radio" data-option="{'url':'host/listdata.asp','param':{'guid':'123456'}}" />
+          <a class="readonlyRadio  but-small but-yellow">停用readonly</a></td>
+      </tr>
+      <tr>
+        <th align="right"><em>录入人</em></th>
+        <td><input  type="text" name="user"  style="width:200px"  readonly="readonly"/></td>
+      </tr>
+      <tr>
+        <th align="right"><em>多图上传</em></th>
+        <td><div class="fm_uploadPicsShow uppicbox" data-option="{'rel':'pics','editable':true}"></div>
+          <input  type="text" name="pics"  style="width:200px"  class="fm_uploadPic" data-option="{'mulit':true,'url':'host/entry_uploadpic.asp'}" /></td>
+      </tr>
+      <tr>
+        <th align="right"><em>多文件上传</em></th>
+        <td><div class="fm_uploadFilesShow upfilebox" data-option="{'rel':'files','editable':true}"></div>
+          <input  type="text" name="files"  style="width:200px"  class="fm_uploadFile" data-option="{'mulit':true,'url':'host/entry_uploadpic.asp'}" />
+          <a class="disabledUpload  but-small but-yellow">禁用disable</a></td>
+      </tr>
+      <tr>
+        <th align="right"><em>单图片上传</em></th>
+        <td><div class="fm_uploadFilesShow upfilebox" data-option="{'rel':'blankfiles','editable':true}"></div>
+          <input  type="text" name="blankfiles"  style="width:200px"  class="fm_uploadFile" data-option="{'mulit':false,'url':'host/entry_uploadpic.asp'}" /></td>
+      </tr>
+      <tr>
+        <th align="right"><em>单文件上传</em></th>
+        <td><div class="fm_uploadPicsShow uppicbox" data-option="{'rel':'blankpics','editable':true}"></div>
+          <input  type="text" name="blankpics"  style="width:200px"  class="fm_uploadPic" data-option="{'mulit':false,'url':'host/entry_uploadpic.asp'}" /></td>
+      </tr>
+    </table>
+  </form>
+</div>
+<!--提交按钮-->
+<div class="submitButs"><a  id="saveButton" class="but-normal but-red"><i class="fa fa-save"></i> 保存</a> <a  id="cancelButton" class="but-normal but-yellow"> <i class="fa fa-reply"></i> 取消</a></div>
+<!--内容部分end-->

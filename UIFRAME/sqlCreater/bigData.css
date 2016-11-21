@@ -1,0 +1,416 @@
+@charset "utf-8";
+.bigDataSearchWraper {
+	position: relative;
+	width: 100%;
+	height: 100%;
+	background-color: #FFF;
+}
+.bigDataResouce {
+	position: absolute;
+	left: 0px;
+	top: 0px;
+	width: 160px;
+	overflow-y: auto;
+	background-color: #026B86;
+}
+.bigDataSearchWraper .bigDataResouce .iconlist p {
+	display: block;
+	padding: 12px;
+	background-color: #007C93;
+	border-radius: 5px 0px 0px 5px;
+	margin-top: 6px;
+	margin-right: 0px;
+	margin-bottom: 6px;
+	margin-left: 6px;
+	color: #D0E0E8;
+	cursor: pointer;
+}
+.bigDataSearchWraper .bigDataResouce .iconlist p a {
+	font-size: 16px;
+	line-height: 22px;
+	color: #FFF;
+	display: block;
+}
+.bigDataSearchWraper .bigDataResouce .iconlist p:hover {
+	background-color: #00A8A8;
+}
+.bigDataSearchWraper .bigDataResouce .iconlist p.nowid {
+	background-color: #FFF;
+	color: #666;
+}
+.bigDataSearchWraper .bigDataResouce .iconlist p.nowid a {
+	color: #F30;
+}
+.bigDataSearchBox {
+	position: absolute;
+	left: 160px;
+	top: 0px;
+	right: 0px;
+	overflow-y: auto;
+	background-color: #FFF;
+}
+.bigDataSearchWraper .bigDataResouce h2 {
+	font-size: 12px;
+	line-height: 28px;
+	color: #CBDFF5;
+	text-align: center;
+	margin: 0px;
+	font-weight: normal;
+	padding-top: 5px;
+	padding-right: 1px;
+	padding-bottom: 1px;
+	padding-left: 1px;
+}
+.bigDataList {
+	position: absolute;
+	top: 0px;
+	right: 0px;
+	overflow-y: auto;
+	margin: 0px;
+	padding: 8px;
+	background-color: #FFFFFF;
+	left: 160px;
+	z-index: 8;
+}
+.bigDataTitle {
+	background-color: #9BC4D9;
+	line-height: 32px;
+	height: 32px;
+	font-size: 14px;
+	padding-left: 15px;
+}
+.bigDataTitle span {
+	display: block;
+	float: right;
+	color: #FFF;
+	text-align: center;
+	padding-right: 8px;
+	padding-left: 8px;
+}
+.bigDataTitle span a {
+	/* [disabled]background-color: #F90; */
+	display: inline-block;
+	white-space: nowrap;
+	padding-right: 30px;
+	padding-left: 30px;
+	margin: 2px;
+	line-height: 26px;
+	border-radius: 4px;
+}
+.bigDataSearchBox .searchRsBox {
+	padding: 8px;
+	border-top-width: 1px;
+	border-top-style: dotted;
+	border-top-color: #E2E2E2;
+	height: 36px;
+}
+.bigDataSearchBox .searchCeartBox {
+	margin: 10px;
+	border: 1px solid #C5DDE7;
+}
+.searchCeartBox .guide {
+	margin: 20px;
+	width: 240px;
+	background-image: url(arrow.png);
+	background-repeat: no-repeat;
+	background-position: left center;
+	padding-top: 0px;
+	padding-right: 0px;
+	padding-bottom: 0px;
+	padding-left: 10px;
+}
+.searchCeartBox .guide div {
+	background-color: #F1D054;
+	margin: 0px;
+	padding: 20px;
+	border-radius: 6px;
+}
+.searchCeartBox .guide p {
+	font-size: 14px;
+	color: #FFF;
+	margin: 0px;
+	padding: 0px;
+}
+.bigDataSearchBox .searchRsBox p {
+	font-weight: normal;
+	margin: 0px;
+	padding: 0px;
+}
+.searchResultMsg {
+	margin: 0px;
+	padding: 6px;
+}
+.searchResultMsg h1 {
+	font-size: 16px;
+	font-weight: normal;
+	line-height: 36px;
+	text-align: center;
+	padding: 0px;
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-bottom: 10px;
+	margin-left: 0px;
+	color: #099;
+}
+.searchResultMsg .msgContent {
+	border: 1px solid #E4E4E4;
+	padding: 15px;
+	margin-top: 5px;
+	margin-right: 0px;
+	margin-bottom: 5px;
+	margin-left: 0px;
+}
+.searchResultMsg p {
+	font-size: 12px;
+	line-height: 24px;
+	margin: 3px;
+	padding: 8px;
+	border-bottom-width: 1px;
+	border-bottom-style: dotted;
+	border-bottom-color: #CCC;
+}
+.searchResultMsg p:nth-last-child(1) {
+	border-bottom-width: 0px;
+	border-bottom-style: none;
+	border-bottom-color: #fff;
+}
+.searchResultMsg p span {
+	display: inline-block;
+	text-align: right;
+	width: 120px;
+	margin-right: 6px;
+}
+.searchResultMsg p strong {
+	display: inline-block;
+	text-align: right;
+	width: 100px;
+	margin-right: 6px;
+	font-size: 18px;
+	color: #F60;
+}
+.searchResultMsg .butbox {
+	text-align: center;
+	padding: 8px;
+	margin-top: 10px;
+	margin-right: 0px;
+	margin-bottom: 0px;
+	margin-left: 0px;
+}
+.searchResultMsg a  {
+	color: #FFF;
+	background-color: #F60;
+	line-height: 24px;
+	white-space: nowrap;
+	display: inline-block;
+	margin: 2px;
+	padding-top: 3px;
+	padding-right: 12px;
+	padding-bottom: 3px;
+	padding-left: 12px;
+	border-radius: 3px;
+	font-size: 14px;
+}
+.searchResultMsg a#closepop {
+	background-color: #099;
+}
+.bd_baseline {
+	transition:width 1s;
+	background-color: #333;
+}
+.bd_bigIcon {
+	transition:left 1s;
+	color: #FFF;
+	background-color: #333;
+	height: 128px;
+	width: 128px;
+	margin: 0px;
+	padding: 0px;
+	border-radius: 128px;
+	cursor: default;
+}
+.bd_bigIcon i {
+	font-size: 72px;
+	line-height: 116px;
+	color: #F90;
+	background-color: #FFF;
+	margin: 6px;
+	padding: 0px;
+	height: 110px;
+	width: 110px;
+	text-align: center;
+	border-radius: 110px;
+	border: 3px solid #FC0;
+}
+.bd_addLinkbut {
+	transition: left 1s;
+	background-color: #333;
+	height: 48px;
+	width: 48px;
+	border-radius: 32px;
+	margin: 0px;
+	padding: 0px;
+	cursor: pointer;
+}
+.bd_addLinkbut i {
+	font-size: 24px;
+	line-height: 38px;
+	color: #FFF;
+	background-color: #F90;
+	margin: 6px;
+	padding: 0px;
+	height: 36px;
+	width: 36px;
+	text-align: center;
+	border-radius: 20px;
+}
+.bd_relationbut {
+	transition: left 1s;
+	background-color: #333;
+	height: 64px;
+	width: 64px;
+	margin: 0px;
+	padding: 0px;
+	border-radius: 64px;
+	font-size: 18px;
+	line-height: 64px;
+	color: #FFF;
+	text-align: center;
+	cursor: pointer;
+}
+.bd_relationbut p {
+	font-size: 20px;
+	line-height: 34px;
+	color: #FFF;
+	margin: 0px;
+	padding: 6px;
+	text-align: center;
+}
+.bd_relationbut span {
+	display: block;
+	text-align: center;
+	font-size: 12px;
+	color: #FFF;
+	line-height: 16px;
+}
+.bd_conditionWraper {
+	transition: left 1s;
+	background-color: #6CF;
+	margin: 0px;
+	padding: 10px;
+	width: 300px;
+	min-height: 60px;
+	border-radius: 8px;
+	z-index: 5;
+}
+.bd_conditionWraper.bd_addCondition{
+	background-color: #FC0;	
+}
+.bd_removeBut {
+	background-color: #F90;
+	margin: 0px;
+	padding: 0px;
+	height: 24px;
+	width: 24px;
+	border-radius: 24px;
+	display: block;
+	cursor: pointer;
+}
+.bd_removeBut i {
+	font-size: 18px;
+	line-height: 24px;
+	color: #FFF;
+	height: 24px;
+	width: 24px;
+	margin: 0px;
+	padding: 0px;
+	border-radius: 24px;
+	text-align: center;
+}
+.bd_relationSelectBut {
+	background-color: #333;
+	border-radius: 64px;
+	width: 64px;
+}
+.bd_relationSelectBut p{
+	height: 54px;
+	width: 54px;
+	margin: 5px;
+	padding: 0px;
+	cursor: pointer;
+	background-color: #333;
+	border-radius: 64px;
+}
+.bd_relationSelectBut p:hover {
+	background-color: #F60;
+}
+.bd_searchTitle {
+	transition: width 1s;
+	text-align: center;
+	margin: 0px;
+	position: absolute;
+	border-top-width: 2px;
+	border-top-style: dotted;
+	border-top-color: #F90;
+	padding-top: 10px;
+	padding-right: 0px;
+	padding-bottom: 10px;
+	padding-left: 0px;
+}
+.bd_searchTitle input {
+	border: 2px solid #999;
+}
+.bd_searchTitle p {
+	margin: 0px;
+	padding: 5px;
+}
+.bd_centerBut {
+	height: 24px;
+	width: 24px;
+	background-color: #333;
+	margin: 0px;
+	padding: 0px;
+	border-radius: 6px;
+	text-align: center;
+}
+.bd_centerBut i {
+	font-size: 16px;
+	line-height: 24px;
+	color: #FFF;
+}
+.bd_conditionForm .conditionItem {
+	background-color: #77D8FD;
+	margin: 2px;
+	padding: 2px;
+	height: 23px;
+	white-space: nowrap;
+}
+.bd_addCondition .bd_conditionForm .conditionItem{
+	background-color: #FFD733;
+	margin: 2px;
+	padding: 2px;
+	height: 23px;
+}
+.bd_conditionForm .conditionItem label.fm_formitemwraper  {
+	margin: 0px;	
+}
+.bd_conditionForm .conditionItem span.conditionlabel {
+	line-height: 18px;
+	width: 96px;
+	height: 17px;
+	overflow: hidden;
+	padding-right: 8px;
+	padding-left: 6px;
+	text-align: right;
+	display: inline-block;
+	padding-top: 3px;
+	padding-bottom: 3px;
+}
+.bd_conditionForm .conditionItem label.fm_formitemwraper:after{
+	content:normal;
+	font-family: Arial, Helvetica, sans-serif;
+	padding-left: 0px;
+	color: #999;
+}
+.bd_conditionForm .conditionItem label input ,.bd_conditionForm .conditionItem .fm_Select_box {
+	border: 1px solid #FFF;
+}

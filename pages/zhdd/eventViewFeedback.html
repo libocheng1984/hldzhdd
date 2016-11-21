@@ -1,0 +1,298 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;		
+	var util = new Util();	
+	var mapObj_event = null;
+	var eventPoint=null;
+	var record = null;
+	var Detailobj;
+	var featureMarker = null;
+	var eventDetailLayer = null;
+	var eventDetailLayerMarker = null;
+	var groupLayer = null;
+	var eventRecord = {};
+	var groupMarkerArray = new Array();
+	var eventMarkerArray = new Array();
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		p.WRAPER.css("overflow","hidden");
+		p.find(".detailBox").css("overflow","hidden");
+		p.find(".detailBox").height(p.WRAPER.height()-p.find(".submitButs").outerHeight(true));
+		p.find(".detailBox").css("overflow-y","auto");
+		p.find(".zediewindow").css("overflow-y","auto");
+	
+		//这个是粘江岸的
+		if(mapObj_event){
+			p.find(".mapbox").height(p.WRAPER.height()-p.find(".submitButs").outerHeight(true)).width(p.WRAPER.width()-400);
+			mapObj_event.updateSize();
+		}
+		
+	}
+		
+	//表单对象
+	 
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+		//这个是粘江岸的
+		if(mapObj_event){
+			mapObj_event.destroy();
+			mapObj_event=null;
+		}
+	}
+	
+	this.READY=function(){
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+		
+		//返回按钮事件
+		p.find("#cancelButton").bind("click",function(){
+			WINDOW.close(p.WINID);//关闭窗口
+		});
+		//表单例子------------------------------------------
+		//表单格式化处理
+		Detailobj=new formDeal(p.find("#Detail"));//(".zediewindow"));
+		if(!p.CONDITION["newrecord"]){			
+			p.CONDITION["newrecord"]=$.extend({},p.CONDITION["record"]);			
+		}
+		record = p.CONDITION["newrecord"];
+		getFormData();
+		p.resize();	
+	}	
+	
+	function mapInit(){
+		var mapId = p.WINID+Math.floor(Math.random()*10000);
+		p.find("#eventViewMap").attr("id",mapId)
+		var olMap = new OlMap();
+		mapObj_event = olMap.mapInitialize(mapId,"",7);
+		
+		
+		eventDetailLayer = new OpenLayers.Layer.Vector("警情");
+		eventDetailLayer.style = {
+			graphicWidth:32,   
+			graphicHeight : 32,   
+			graphicXOffset : -16,   
+			graphicYOffset : -16,   
+			externalGraphic : "images/zhdd/jingqing_1.png"
+		}
+		eventDetailLayerMarker = new OpenLayers.Control.DrawFeature(eventDetailLayer, OpenLayers.Handler.Point);
+		eventDetailLayerMarker.events.on({"featureadded" : function(drawGeometryArgs){
+			
+			if(featureMarker){
+				removeAllFeatures(eventDetailLayer,featureMarker);
+			}
+			featureMarker = drawGeometryArgs.feature;
+			record['jqjqzb'] = featureMarker.geometry.toString();
+		}});
+		
+		mapObj.addControls([eventDetailLayerMarker]);
+		mapObj_event.addLayer(eventDetailLayer);
+		p.find(".mapicon").bind("click",setMapCenter);
+	}
+	
+	function setMapCenter(){
+		if(eventPoint!=null){
+			mapObj_event.setCenter(eventPoint);
+		}
+	}
+	
+	
+	//编辑状态，获取数据
+	function getFormData(){
+		//debugger;
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){
+		 	 record= backJson["value"];
+		 	 if(record['jqjqzb']){
+		 	 	 p.find("#searchButton").hide();
+				 p.find("#mapButton").hide();
+		 	 }else{
+		 	 	p.find("#searchButton").bind("click",SearchButtonClick);
+				p.find("#mapButton").bind("click",mapButtonClick);
+		 	 }
+			Detailobj.bindData(record);//绑定数据
+			p.find("#saveButton").bind("click",SaveForm);	
+		})
+		Loader.POSTDATA("php/event/GetFeedDetailById.php",{"event":"FormEdit","content":{"condition":{"jqid":record['jqid']}},"extend":{}});				
+	}
+	
+	//提交保存
+	function SaveForm(){
+		//debugger;
+		if(Detailobj.check()){ //数据校验
+			if(record['jqjqzb']==""){
+				$.message("请预标一个地理位置!");
+				return;
+			}
+			//保存失败
+			var errorBack=function(e){				
+				p.find("#saveButton").removeClass("disable");//解按钮
+			}	
+			//保存成功
+			var saveResult=function(e,BackJson){
+				$.message("保存成功！",2000);
+				var parentWindow=WINDOW.getActionById(p.CONDITION["parentid"]);//通过窗体ID找到窗体对象（ACTION）
+				//parentWindow.refesh(); //执行父窗体方法
+				WINDOW.	close(p.WINID);//关闭窗口
+				WINDOW.	close(parentWindow.WINID);//关闭窗口
+			}
+			//获取表单数据
+			formData=Detailobj.getData();
+			formData['jqjqzb']=record['jqjqzb'];
+			if(formData['belong'])formData['belong']=formData['belong'][0];
+			if(formData['scene'])formData['scene']=formData['scene'][0];
+			formData = $.extend({},record,formData);
+			p.find("#saveButton").addClass("disable");//锁按钮			
+			var postData={"event":"saveForm",
+									"extend":{"eventswitch":"save"},
+									"content":{"condition":formData}
+									};		
+			var Loader=new AJAXObj();
+			$(Loader).unbind().one("JSON_LOADED",saveResult).one("SYS_ERROR",errorBack);			
+			Loader.POSTDATA("php/event/UpdateFeedBack_web.php",postData);
+		}
+	}
+	
+	
+	function SearchButtonClick(){
+		var address = p.find("#jqdd").val();
+		WINDOW.open({"name":p.WINID+"_searchButton","width":670,"height":400,"url":"pages/zhdd/addressGrid.html","title":"地址定位","lock":true,'position':'left_center'},{"address":address,"winId":p.WINID},p.find("#searchButton"));
+	}
+
+	function mapButtonClick(){
+		var mapDiv = p.find("#mapDiv").css("display");
+		if(mapDiv=="none"){
+				p.find("#mapDiv").css("display","block");
+				p.find(".zediewindow").css("width","450px");
+				mapInit();
+				p.resize();// by Carl
+		}
+		
+		eventDetailLayerMarker.activate();
+	}
+	
+	
+	
+	this.addEventMarker = function(address,x,y,substationCode,orgName){
+		
+		var mapDiv = p.find("#mapDiv").css("display");
+		if(mapDiv=="none"){
+				p.find("#mapDiv").css("display","block");
+				p.find(".zediewindow").css("width","450px");
+				mapInit();
+				p.resize();// by Carl
+		}
+		
+		p.find("#jqdd").val(address);
+		//alert(p.find("[name=bmdm]").length);
+		//alert(substationCode);
+		if(featureMarker){
+			removeAllFeatures(eventDetailLayer,featureMarker);
+		}
+		addEventDataMarker(x,y);
+		
+		
+		eventPoint = new OpenLayers.LonLat(x,y);
+		mapObj_event.setCenter(eventPoint);
+	}
+	
+	/**
+	 * addEventDataMarker
+	 * 添加警情点覆盖物
+	 */
+	function addEventDataMarker(x,y) {
+		point = new OpenLayers.Geometry.Point(x,y)
+		img = "images/zhdd/jingqing_1.png";
+		featureMarker = new OpenLayers.Feature.Vector();
+					featureMarker.geometry = point;
+					featureMarker.style = {
+						graphicWidth:32,   
+						graphicHeight : 32,   
+						graphicXOffset : -16,   
+						graphicYOffset : -16, 
+						externalGraphic : img
+					};
+		featureMarker.trafficInfo = record;
+		record['jqjqzb'] = featureMarker.geometry.toString();
+		eventDetailLayer.addFeatures(featureMarker);
+	}
+	
+	
+	/*清除相对应的feature*/
+	function removeAllFeatures(vector,geometry){
+		var vectors = new Array();
+		vectors.push(geometry);
+		vector.removeFeatures(vectors);
+	}
+	
+}
+</script>
+<!--地图部分-->
+<div id="mapDiv" style="position:relative;height:0px;width:100%;display: none;">
+<div id="eventViewMap" class="mapbox" style="background-color:#CCC;position:absolute;left:390px;top:0px;width: 250px;height: 400px;"></div>
+<div class="mapicon center" style="top:3px;right:3px"><i class="fa fa-crosshairs"></i></div>
+</div>
+<!--表单-->
+<div class="detailBox">
+  <div class="zediewindow">
+  <form id="Detail">
+    <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab">
+      <tr>
+        <th width="20%" align="right"><i>警情地址</i></th>
+        <td width="80%"><input id="jqdd" name="jqdd" maxlength="200" type="text" class="must" style="width:200px"/>
+        	<a  id="searchButton" class="but-small but-green">定位</a><a  id="mapButton" class="but-small but-green">预标</a>
+        </td>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>处理结果</i></th>
+        <td width="80%"><input name="cljg" maxlength="2000" type="text"  style="width:200px" /></td>
+      </tr>
+      <tr>
+        <th align="right"><i>处警领导</i></th>
+        <td><input name="cjld" maxlength="30" type="text"  style="width:200px" /></td>
+      </tr>
+      <tr>
+        <th align="right"><i>受伤人数</i></th>
+        <td><input name="ssrs" maxlength="4" class="check_uint" type="text" style="width:200px" /></td>
+      </tr>
+      <tr>
+        <th align="right"><i>死亡人数</i></th>
+        <td><input name="swrs" maxlength="4" class="check_uint" type="text" style="width:200px" /></td>
+      </tr>
+      <tr>
+        <th align="right"><i>抓获作案人数</i></th>
+        <td><input name="zhrs" maxlength="4" class="check_uint" type="text" style="width:200px" /></td>
+      </tr>
+      <tr>
+        <th align="right"><i>直接经济损失</i></th>
+        <td><input name="jjssqk" maxlength="200" type="text" style="width:200px" /></td>
+      </tr>
+      <tr>
+        <th align="right"><i>救助群众人数</i></th>
+        <td><input name="jzrs" maxlength="4" class="check_uint" type="text" style="width:200px" /></td>
+      </tr>
+      <tr>
+        <th align="right"><i>解救妇女人数</i></th>
+        <td><input name="jjfvrs" maxlength="4" class="check_uint" type="text" style="width:200px" /></td>
+      </tr>
+      <tr>
+        <th align="right"><i>解救儿童人数</i></th>
+        <td><input name="jjetrs" maxlength="4" class="check_uint"  type="text" style="width:200px" /></td>
+      </tr>
+      <tr>
+      	<th align="right"></th>
+        <td ><label><input type="checkbox" name="belong" value="1" class="fm_noAutoPost"/>属于街面</label>
+        <label><input type="checkbox" name="scene" value="1"  class="fm_noAutoPost"/>已立/拟立</label> </td>
+      </tr>
+    </table>
+  </form>
+ </div>
+</div>
+<!--提交按钮-->
+<div class="submitButs"><a  id="saveButton" class="but-normal but-red"><i class="fa fa-save"></i> 确认并结束警情</a> <a  id="cancelButton" class="but-normal but-greenlight"> <i class="fa fa-reply"></i> 返回</a></div>
+<!--内容部分end--> 
+

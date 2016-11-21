@@ -1,0 +1,53 @@
+<script type="text/javascript">
+function ACTION(){
+	var p=this;
+	var iconBox;
+	var footBox;
+	var closeBut;
+	
+	this.READY=function(){		
+		iconBox=p.find(".iconbox");
+		footBox=$(".footBar");
+		closeBut=$(".footClose");
+		p.install();
+		iconBox.find("a").menuButton({"guid":"123456789"});
+	}
+	
+	this.install=function(){
+		iconBox.css("transition","bottom 0.6s  cubic-bezier(0.86, 0, 0.03, 1)");
+		footBox.css("transition","bottom 0.8s  cubic-bezier(0.86, 0, 0.03, 1)");
+		
+		closeBut.bind("click",function(){
+			$(this).hasClass("close")?p.show():p.hide();
+		})
+	}
+	
+	this.hide=function(){		
+		iconBox.css("bottom","-100px");
+		footBox.css("bottom","-100px");
+		closeBut.addClass("close");
+		closeBut.find("i").attr("class","fa fa-angle-up")
+	}
+	
+	this.show=function(){
+		iconBox.css("bottom","8px");
+		footBox.css("bottom","0px");
+		closeBut.removeClass("close");
+		closeBut.find("i").attr("class","fa fa-angle-down");
+	}	
+}
+</script>
+<div class="iconbox leftpart noselect">
+ <a data-option="{'name':'window_001','width':670,'height':270,'url':'pages/zhdd/zhdd.html','title':'指挥调度中心','position':'left_top'}"><i class="fa fa-users"></i>指挥调度中心</a> 
+ <a data-option="{'name':'window_002','width':670,'height':270,'url':'pages/zhdd/overEvent.html','title':'结束警情','position':'left_top'}"><i class="fa fa-list"></i>结束警情</a> 
+ <a data-option="{'name':'window_003','width':600,'height':270,'url':'pages/equip/policeGroup.html','title':'巡逻组查询','position':'left_bottom'}"><i class="fa fa-align-justify"></i>巡逻组查询</a> 
+ <a data-option="{'name':'window_004','width':600,'height':270,'url':'pages/equip/xltzbcx.html','title':'巡逻特征查询','position':'left_bottom'}"><i class="fa fa-reorder"></i>巡逻特征查询</a>
+ <span></span>
+</div>
+<div class="iconbox rightpart noselect"><span></span>
+ <a data-option="{'name':'window_005','width':600,'height':270,'url':'pages/equip/xkzhcx.html','title':'巡逻绑定查询','position':'left_bottom'}"><i class="fa fa-trophy"></i>巡逻绑定查询</a>
+ <a data-option="{'name':'window_009','width':1200,'height':470,'url':'pages/zhdd/zbbd.html','title':'装备绑定','side':'right'}"><i class="fa fa-plus"></i>装备绑定</a>
+ <a data-option="{'name':'window_006','width':400,'url':'pages/dataGrid.html','title':'警务搜索引擎','target':'slide','fullscreen':true,'side':'right'}"><i class="fa fa-plus"></i>警务搜索引擎</a>
+ <a data-option="{'name':'window_007','width':300,'url':'pages/tree.html','title':'系统管理中心','target':'slide','dragable':false,'side':'left'}"><i class="fa fa-gear"></i>系统管理中心</a> 
+ <a data-option="{'name':'window_008','width':400,'url':'pages/zhdd/roundSearch.html','title':'警务搜索引擎','side':'right'}"><i class="fa fa-plus"></i>警务搜索引擎</a>
+</div>

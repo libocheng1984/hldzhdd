@@ -1,0 +1,153 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行READY方法，代替document.ready执行
+//重要：写在ACTION外的方法是全局方法，尽量不要这么干，以免方法冲突。
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//重要：页面关闭的时候会尝试执行DESTROY方法，请在这里解除事件绑定，销毁对象，以免窗体残留。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+//重要：保证标签完整闭合，否则IE8报错 “ACTION_Window_1426578029038953”未定义
+function ACTION(){
+	var p=this;	
+	var record = null;
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){ 
+		p.find("#tt").datagrid("resize"); 
+	}
+	
+	var SearchForm;
+	
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){
+		record = p.CONDITION['record'];
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+		
+		//表单处理
+		SearchForm=new detailDeal(p.find("#searchForm"));
+		SearchForm.parse();
+		SearchForm.bindData(p.CONDITION);//绑定默认条件		
+		
+		//表格例子------------------------------------------EasyUI组件
+		var clumoption=[[
+			{field:'zlbh',title:'指令编号',width:"23%",fixed:true,align:"center"},
+			{field:'xm',title:'处警人',width:"20%",resizable:false,align:"center"},
+			{field:'zlxdsj',title:'指令下达时间',width:"30%"},
+			{field:'zlbs',title:'类型',width:"25%",formatter:function(value,record,index){
+					var result = value;
+					if(value=="1"){
+						result = "首发指令";
+					}else{
+						result = "支援指令";
+					}
+	               	return result;
+              }}
+			]];
+		p.find("#tt").datagrid({
+			fit:true,
+			showFooter:true,//显示总计??
+			rownumbers:true,//行号
+			singleSelect:true,
+			fitColumns:true,//宽度自适应
+			striped:true,//条纹
+			onClickRow:dataGridClick,
+			columns:clumoption
+		})
+		SubmitForm=new formDeal(p.find("#Form"));
+		$(SubmitForm).one("HTML_FORMATED",getFormData);//绑定格式化完成事件，执行下一步
+		SubmitForm.parse();
+		//更新一下尺寸
+		p.resize();
+		
+	}
+
+	//编辑状态，获取数据
+	function getFormData(){ 
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){	
+			records=  backJson["value"];
+			p.find("#tt").datagrid("loadData",records);
+			for(var i=0;i<records.length;i++)
+			 {
+			 	if(records[i]['zlbs']=="1"){
+			 		SubmitForm.bindData(records[i]);//绑定数据	
+			 		var jqztdm = records[i]['jqztdm'];
+			 		p.find("#jqztdm").text(util.getJqclzt(jqztdm));
+			 		break;
+			 	}
+			 }
+				
+		})
+		Loader.POSTDATA("php/event/GetComandByCjdbh_web.php",{"event":"FormEdit","content":{"condition":{"cjdbh":record['cjdbh']}},"extend":{}});				
+			
+		p.find("#cancelButton").bind("click",function(){ 
+			WINDOW.	close(p.WINID);//关闭窗口
+		});
+	}
+	
+	//datagrid行点击
+	function dataGridClick(rowIndex,rowData){ 
+		SubmitForm.bindData(rowData);//绑定数据	
+ 		var jqztdm = rowData['jqztdm'];
+ 		p.find("#jqztdm").text(util.getJqclzt(jqztdm));
+	}
+	
+}
+</script>
+
+<!--内容部分start-->
+<!--表格-->
+<!-- <i>指令信息列表</i>-->
+<div class="datalist" style="height:200px">
+  <div id="tt"> </div>
+</div>
+<div class="formBox">
+  <form id="Form">
+    <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" data-option="{'title':'处警信息','open':false}">
+	  <!-- 反馈信息 -->
+	  <!-- start -->
+	  <tr>
+        <th colspan="4" align="center"><i>指令信息</i></th>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>指令编号</i></th>
+		<td><span id="zlbh"></span></td>
+        <th width="20%" align="right"><i>处警人员编号</i></th>
+		<td><span id="rybh"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>处警人员姓名</i></th>
+		<td><span id="xm"></span></td>
+        <th align="right"><i>出警情况</i></th>
+		<td><span id="cjqk"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>指令下达时间</i></th>
+		<td><span id="zlxdsj"></span></td>
+        <th align="right"><i>指令接受时间</i></th>
+		<td><span id="zljssj"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>到达现场时间</i></th>
+		<td><span id="ddxcsj"></span></td>
+		<th align="right"><i>处理完毕时间</i></th>
+		<td><span id="clwbsj"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>处理结果</i></th>
+		<td><span id="cljg"></span></td>
+        <th align="right"><i>警情状态代码</i></th>
+		<td><span id="jqztdm"></span></td>
+      </tr>
+	  <!-- end -->
+  </table>
+  </form>
+</div>
+<!--内容部分end--> 
+<div class="submitButs"><a  id="cancelButton" class="but-normal but-greenlight"> <i class="fa fa-reply"></i> 返回</a></div>
+
+

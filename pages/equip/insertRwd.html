@@ -1,0 +1,653 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	//表单对象
+	var SubmitForm;
+	var mapObj = null;
+	var rwdLayer = null;
+	var rwdPoint = null;
+	var featureMarker = null;
+	var polygon = null;
+	var refLayer = null;
+	var isClose = null;
+	//点时间段数据
+	var TimePartList;
+        var LAYOUT;	//定义布局
+	var MapContainer;	//地图容器
+        var clustersLayer = null;
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+            p.find("#framelayout").css({"background-color":"#eee"}).fillParent(); 		
+	    LAYOUT?LAYOUT.resize():null;	
+	    p.find(".formBox").css({"overflow-y":"auto"});
+	}	
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+		if(refLayer){	
+			refLayer.removeAllFeatures();
+		}
+		if(rwdPoint){	
+			rwdPoint.deactivate();
+		}
+		if(rwdLayer){
+			rwdLayer.removeAllFeatures();
+		}
+		isClose = null;
+		if(TimePartList){
+			TimePartList.destroy();
+			TimePartList=null;	
+		}
+		WINDOW.reStore(p.CONDITION['parentid']);
+                LAYOUT.destroy();
+	}
+	
+	this.READY=function(){
+		isClose = true;
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+		//创建时间段列表对象-------------------11.18
+		var listOption={"actionFormatFun":function(RowObj){
+                RowObj.find("input.fm_datepartinput").DatePartPicker();//安装时间段组件
+                RowObj.find("a.delbut").bind("click",function(){	//绑定删除按钮
+                var rowData=RowObj.data("data");	
+                if(rowData["xlid"]){
+                $.confirm("是否删除巡逻任务?",function(rs){
+                if(rs){
+                TimePartList.removeOneRow(RowObj.index());	
+                }
+                })	
+                }	
+                return false;
+                })
+                }};
+		TimePartList=new ListView(p.find(".fm_autoAddForm"),null,listOption);
+		//绑增加按钮
+		p.find("a#addTimepart").bind("click",insertBlankTimePart);
+		//创建时间段列表对象-------------------11.18
+		//表单格式化处理
+		SubmitForm=new formDeal(p.find("#Form"));
+		$(SubmitForm).one("HTML_FORMATED",getFormData);//绑定格式化完成事件，执行下一步	
+		SubmitForm.parse();
+               
+		p.find("#saveButton").bind("click",SaveForm);
+		p.find("#cancelButton").bind("click",function(){ 
+			if(refLayer){	
+				refLayer.removeAllFeatures();
+			}
+			if(rwdPoint){	
+				rwdPoint.deactivate();
+			}
+			if(rwdLayer){
+				rwdLayer.removeAllFeatures();
+			}
+			//返回展开列表---------------------------------------
+			WINDOW.reStore(p.CONDITION['parentid']);
+			WINDOW.close(p.WINID);//关闭窗口			
+		});		
+		
+                //表单格式化处理
+		FormDeal=new formDeal(p.find("#searchForm"));
+		FormDeal.parse();
+                p.find("#searchButton").bind("click",StartSearch);
+                
+		//更新一下尺寸
+		p.resize();	
+                LAYOUT=new frameLayout(p.find("#framelayout"));	
+                
+                //布局调整事件处理--------
+		$(LAYOUT).bind("LAYOUT_RESIZE",function(){ 
+                     p.find("#mainMapFroSelect").height(p.find("#mainMapFroSelect").parent().height()-p.find("#searchForm").outerHeight(true)-10);
+			//p.find("#mainMapFroSelect").fillParent();
+			//重铺地图
+			//var center = map.getCenter();
+    		//map.checkResize();
+    		//map.setCenter(center);	
+		});
+                p.find("#mainMapFroSelect").height(p.find("#mainMapFroSelect").parent().height()-p.find("#searchForm").outerHeight(true)-10);
+                p.find("#formTemp").css({"overflow-y":"auto"});
+                 mapInit();
+		addRwdLayer();
+		loadFeatures();
+                
+		
+		p.find("#searchButton").bind("click",StartSearch);
+	}
+       function mapInit(){
+                
+		var mapId = p.WINID+Math.floor(Math.random()*10000);
+		p.find("#mainMapFroSelect").attr("id",mapId)
+		var olMap = new OlMap();
+		mapObj = olMap.mapInitialize(mapId,"",7);
+		var style = new OpenLayers.Style({
+					label: "${count}",
+                    graphicWidth:36,   
+					graphicHeight : 36,   
+					graphicXOffset : -18,   
+					graphicYOffset : -18,   
+					externalGraphic : "images/cluster.png" 
+                }, {
+                    context: {
+                        width: function(feature) {
+                            return (feature.cluster) ? 2 : 1;
+                        },
+                        radius: function(feature) {
+                            var pix = 2;
+                            if(feature.cluster) {
+                                pix = Math.min(feature.attributes.count, 7) + 2;
+                            }
+                            return pix;
+                        },
+						count: function (feature) {
+							clearInfoWindow(); 
+                       		return feature.attributes.count;
+                   		},
+                    }
+                });
+                
+		var strategy = new OpenLayers.Strategy.Cluster();
+		clustersLayer = new OpenLayers.Layer.Vector("警情聚合", {
+					strategies: [strategy],
+					styleMap: new OpenLayers.StyleMap({
+						"default": style,
+						"select": {
+							fillColor: "#8aeeef",
+							strokeColor: "#32a8a9"
+						}
+					})
+				})
+		var selectControl = new OpenLayers.Control.SelectFeature(clustersLayer,
+		{	
+			onSelect:function(feature){onFeatureSelect(feature)},
+			onUnselect: function(feature){onFeatureUnselect(feature)}
+		});
+                var styleLight = new OpenLayers.StyleMap({
+                "default": new OpenLayers.Style({
+					strokeColor:"#EFA110",
+					strokeOpacity:1,   
+					strokeWeight:1,
+					fillColor:"#F2CF90",
+					fillOpacity:0.2,  
+                })
+                 });
+                var rwdRefLayer = new OpenLayers.Layer.Vector("rwdRefLayer",{styleMap: styleLight,displayInLayerSwitcher:false});
+                var rwdLayer = new OpenLayers.Layer.Vector("任务点",{displayInLayerSwitcher:false});
+                rwdLayer.events.on(rwdListener());
+		mapObj.addControl(selectControl);
+		selectControl.activate();
+		mapObj.addLayers([clustersLayer,rwdRefLayer,rwdLayer]);
+	}
+	function rwdListener(){
+		var rwdListeners = {
+	           'featureselected':function(evt){
+	           		debugger;
+	               var feature = evt.feature;
+	               var innerHtml = "<div style='font-size:.9em'>点位信息";
+	               for(var i=0;i<feature.info.timePartArray.length;i++){
+	               		if(i==0){	
+	               		innerHtml =  innerHtml+"<br>——————————————————<br>点位名称："+feature.info.kdmc+"<br>巡逻时间："+feature.info.timePartArray[i].kdsj+"<br>应打次数："+feature.info.timePartArray[i].ydcs+"<br>间隔时间（秒）："+feature.info.timePartArray[i].jgsj;
+	               		}else{
+	               		innerHtml =  innerHtml+"<br>——————————————————<br>巡逻时间："+feature.info.timePartArray[i].kdsj+"<br>应打次数："+feature.info.timePartArray[i].ydcs+"<br>间隔时间（秒）："+feature.info.timePartArray[i].jgsj;
+	               		}
+	               }
+	               innerHtml = innerHtml+"</div>";
+	               var popup = new OpenLayers.Popup.FramedCloud("popup",
+	                   OpenLayers.LonLat.fromString(feature.geometry.toShortString()),
+	                   null,
+	                  // "<div style='font-size:.9em'>点位信息<br>——————————————————<br>点位名称："+feature.info.kdmc+"</div>",
+	                  innerHtml,
+	                   null,
+	                   false
+	               );
+	               feature.popup = popup;
+	               mapObj.addPopup(popup);
+	           },
+	           'featureunselected':function(evt){
+	               var feature = evt.feature;
+	               mapObj.removePopup(feature.popup);
+	               feature.popup.destroy();
+	               feature.popup = null;
+	           }
+	       }
+	     return rwdListeners;
+	}
+	function refreshCluster() {
+		if (!records || records.length==0) {
+			return;
+		}
+		
+		var features = [];
+		for (var i=0;i<records.length;i++){
+			//px = Math.random() * (122 - 121 + 0.001) + 121;
+            //py = Math.random() * (30 - 29 + 0.001) + 29;
+			if (!records[i].x||!records[i].y) {
+				continue;
+			}
+			var markerPosition = new OpenLayers.Geometry.Point(records[i].x, records[i].y);
+			//var markerPosition = new OpenLayers.Geometry.Point(px, py);
+			var f = new OpenLayers.Feature.Vector();
+				f.trafficInfo = records[i];
+				f.geometry = markerPosition;
+				features.push(f); 
+		}
+		clearInfoWindow(); 
+		clustersLayer.removeAllFeatures();
+		clustersLayer.addFeatures(features);
+
+	}
+	
+	function onFeatureSelect(ft){
+		if(ft['cluster'].length==1){
+			clearInfoWindow();
+			   var bjnr = ft['cluster'][0].trafficInfo.bjnr!=null?ft['cluster'][0].trafficInfo.bjnr:"";
+			   var jqdd = ft['cluster'][0].trafficInfo.jqdd!=null?ft['cluster'][0].trafficInfo.jqdd:"";
+			   var bjsj = ft['cluster'][0].trafficInfo.bjsj!=null?ft['cluster'][0].trafficInfo.bjsj:"";
+			   var jqjssj = ft['cluster'][0].trafficInfo.jqjssj!=null?ft['cluster'][0].trafficInfo.jqjssj:"";
+			   var stationhouse = ft['cluster'][0].trafficInfo.stationhouse!=null?ft['cluster'][0].trafficInfo.stationhouse:"";
+               var popup = new OpenLayers.Popup.FramedCloud("popup",
+                   ft.geometry.getBounds().getCenterLonLat(),
+                   null,
+                    '<div style="font-size:.9em">报警内容：'+bjnr+'<br>警情地址：'+jqdd+'<br>报警时间：'+bjsj+'<br>结束时间：'+jqjssj+'<br>所属部门：'+stationhouse+'</div>',
+                   null,
+                   false
+               );
+            ft.popup = popup;
+            mapObj.addPopup(popup);
+		}
+	}
+	
+	
+	
+	function onFeatureUnselect(feature) {
+		if(feature.popup){
+            mapObj.removePopup(feature.popup);
+            feature.popup.destroy();
+            feature.popup = null;
+		}
+   }
+	
+	/*清除所有popup*/
+	function clearInfoWindow(){
+		//selectFeature.unselectAll();
+		var popArr = mapObj.popups;
+		for (var i=0;i<popArr.length;i++){
+			mapObj.removePopup(popArr[i]);
+		}
+	}
+	
+	/*
+	function StartSearch(){
+		debugger;
+			var postData={
+					mode: 1,
+					cjjg: "",
+					limit: 9999
+				};
+			var Loader=new AJAXObj();
+			$(Loader).bind("JSON_LOADED",function(e,backJson){	
+				var result = backJson["value"];
+				records= result;
+				refreshCluster();
+			});
+			
+			Loader.POSTDATA("php/jqfj/Vilation.php",postData);
+	}
+	*/
+	
+	function StartSearch(){
+		debugger;
+		if(FormDeal.check()){ //数据校验
+			var searchCondition=FormDeal.getData();//获取表单条件
+			
+			var starttime = searchCondition['starttime'];
+			var endtime = searchCondition['endtime'];
+			if(endtime==''||starttime==''||endtime<starttime){
+				$.error("请输入正确的查询时间");
+				return;
+			}
+			
+			var postData={
+					"event":"EVENT",
+					"extend":{"eventswitch":"load"},
+					"content":{"condition":searchCondition}
+				};
+			var Loader=new AJAXObj();
+			$(Loader).bind("JSON_LOADED",function(e,backJson){	
+				records = backJson["value"];
+				refreshCluster();
+			});
+			
+			Loader.POSTDATA("php/ajfx/GetJqfx_web.php",postData);
+		}
+	}
+	
+	
+	
+	
+	//增加时间段表单------11.18
+	function insertBlankTimePart(){
+		TimePartList.insert({});
+	}
+	
+	function loadFeatures(){
+		var postData={
+					"event":"EVENT",
+					"extend":{"eventswitch":"load"},
+					"content":{"condition":{"userId":userData.userId}}
+				};
+			var Loader=new AJAXObj();
+			$(Loader).bind("JSON_LOADED",function(e,backJson){	
+					if(isClose){
+						debugger;
+						if(backJson["value"]&&backJson["value"][0]&&backJson["value"][0]['AdminArea']&&backJson["value"][0]['AdminArea'].indexOf(";")!=-1)
+						{
+							addMULTIPolygonFeatures(backJson["value"]);
+						}
+						else
+						{
+							addPolygonFeatures(backJson["value"]);
+						}
+					}
+			});
+			
+		Loader.POSTDATA("php/equip/LoadFeatures_web.php",postData);
+	}
+	function addMULTIPolygonFeatures(records){
+		if(records&&records[0]){
+			var mutilips = records[0]['AdminArea'].split(";");
+			var wkt="MULTIPOLYGON(((";
+			for (var j=0;j<mutilips.length;j++){
+				if(j!=0){
+					wkt += ",((";
+				}
+				var points = mutilips[j].split(",");
+				for (var i=0;i<points.length;i++){
+					if(points[i]>90&&i+1<points.length&&points[i+1]<90){
+						var pointStr = points[i]+" "+points[i+1];
+						flag = i==0 ? "" : ",";
+						wkt += flag + pointStr;
+					}
+				}
+				wkt += "))";
+			}
+			wkt += ")";
+			//console.log(wkt);
+			polygon = OpenLayers.Geometry.fromWKT(wkt);
+			if(polygon){
+				refLayer = mapObj.getLayersByName("rwdRefLayer")[0];
+				refLayer.removeAllFeatures();
+				var ft = new OpenLayers.Feature.Vector(polygon);
+				refLayer.addFeatures([ft]);
+			}
+		}
+	}
+	function addPolygonFeatures(records){
+		if(records&&records[0]){
+			var mutilips = records[0]['AdminArea'].split(";");
+			var wkt="POLYGON((";
+			for (var j=0;j<mutilips.length;j++){
+				if(j!=0){
+					wkt += ",(";
+				}
+				var points = mutilips[j].split(",");
+				for (var i=0;i<points.length;i++){
+					if(points[i]>90&&i+1<points.length&&points[i+1]<90){
+						var pointStr = points[i]+" "+points[i+1];
+						flag = i==0 ? "" : ",";
+						wkt += flag + pointStr;
+					}
+				}
+				wkt += ")";
+			}
+			wkt += ")";
+			//console.log(wkt);
+			polygon = OpenLayers.Geometry.fromWKT(wkt);
+			if(polygon){
+				refLayer = mapObj.getLayersByName("rwdRefLayer")[0];
+				refLayer.removeAllFeatures();
+				var ft = new OpenLayers.Feature.Vector(polygon);
+				refLayer.addFeatures([ft]);
+			}
+		}
+	}
+	
+	function addRwdLayer(){
+	   
+	    rwdLayer = mapObj.getLayersByName("任务点")[0];
+	    rwdLayer.style = {
+			graphicWidth:24,   
+			graphicHeight : 24,   
+			graphicXOffset : -12,   
+			graphicYOffset : -12,   
+			externalGraphic : "images/zhdd/rwd.png"
+		}
+		//fenceLayer = new OpenLayers.Layer.Vector("巡逻区域",{eventListeners: eventListeners});
+		rwdLayer.setVisibility(true);
+		
+		//mapObj.addLayer(fenceLayer);
+		
+		rwdPoint = new OpenLayers.Control.DrawFeature(rwdLayer, OpenLayers.Handler.Point);
+		rwdPoint.events.on({"featureadded" : function(drawGeometryArgs){
+			featureMarker = drawGeometryArgs.feature;
+			if(polygon){
+				debugger;
+				if(polygon.components instanceof Array)
+				{
+					var pc_flag=true;
+					for(var pi=0;pi<polygon.components.length;pi++){
+						if(polygon.components[pi]&&polygon.components[pi].containsPoint(featureMarker.geometry)){
+							rwdPoint.deactivate();
+							p.find("[name=actionPosition]").val(featureMarker.geometry.x+","+featureMarker.geometry.y);
+							p.find("[name=geometry]").val(featureMarker.geometry.toString());
+							pc_flag=false;
+							break;
+						}
+					}
+					if(pc_flag)
+					{
+						$.message("你所选择的点位坐标不在你所属辖区范围内</br>请重新选择！",2000);
+						rwdLayer.removeAllFeatures();
+					}
+				}
+				else
+				{
+					if(polygon&&polygon.containsPoint(featureMarker.geometry)){
+						rwdPoint.deactivate();
+						p.find("[name=actionPosition]").val(featureMarker.geometry.x+","+featureMarker.geometry.y);
+						p.find("[name=geometry]").val(featureMarker.geometry.toString());	
+					}else{
+						$.message("你所选择的点位坐标不在你所属辖区范围内</br>请重新选择！",2000);
+						rwdLayer.removeAllFeatures();
+					}
+				}
+			}else{
+				rwdPoint.deactivate();
+				p.find("[name=actionPosition]").val(featureMarker.geometry.x+","+featureMarker.geometry.y);
+				p.find("[name=geometry]").val(featureMarker.geometry.toString());
+			}
+			
+		}});
+		
+		mapObj.addControl(rwdPoint);
+		p.find("#positionBtn").bind("click",function(){
+			rwdLayer.removeAllFeatures();
+			rwdPoint.activate();
+		})
+	}		
+	
+	//编辑状态，获取数据
+	function getFormData(){
+		//debugger; 
+		if(p.CONDITION['rowData']){
+			record=$.extend(true,{},p.CONDITION['rowData'])
+			var point = OpenLayers.Geometry.fromWKT(record.geometry);
+			record['actionPosition'] = point.x+","+point.y;
+			//绑定时间段列表数据------11.18
+			TimePartList.bindData(record["timePartArray"]);			
+			//绑定时间段列表数据------11.18
+			SubmitForm.bindData(record);//绑定数据	
+		}else{
+			SubmitForm.bindData();//绑定数据	
+		}
+		
+	}
+	
+	//提交保存
+	function SaveForm(){
+		if(SubmitForm.check()&& p.find(".fm_autoAddForm").checkForm()){ //数据校验,addCheck--附加校验，没有可不填
+			//保存失败
+			var errorBack=function(e){				
+				p.find("#saveButton").removeClass("disable");//解按钮
+			}	
+			//保存成功
+			var saveResult=function(e,BackJson){
+				$.message("保存成功！",2000);
+				var parentWindow=WINDOW.getActionById(p.CONDITION["parentid"]);//通过窗体ID找到窗体对象（ACTION）
+				parentWindow.refesh(); //执行父窗体方法
+				if(rwdLayer)rwdLayer.removeAllFeatures();
+				WINDOW.close(p.WINID);//关闭窗口
+				//返回展开列表---------------------------------------
+				WINDOW.reStore(p.CONDITION['parentid']);
+			}
+			//获取表单数据
+			formData=SubmitForm.getData();
+			//取时间段数据，附加到表单数据------11.18
+			var timePartsArray=[];
+			var len=TimePartList.getData().length;
+			debugger;
+			for(var i=0;i<len;i++){
+				var rowObj=TimePartList.findRow(i); //获取每部分数据，如需校验加此处
+				var serObj = rowObj.serializeJson();
+				timePartsArray.push(serObj);
+			}
+			if(timePartsArray.length==0){
+				$.alert("巡逻时间段未设置。");
+				return;
+			}
+			//附加到表单
+			formData["timePartArray"]=timePartsArray;
+			//取时间段数据------11.18
+			p.find("#saveButton").addClass("disable");//锁按钮			
+			var postData={"event":"saveForm",
+									"extend":{"eventswitch":"save"},
+									"content":{"condition":p.CONDITION,"value":formData}
+									};		
+			var Loader=new AJAXObj();
+			$(Loader).unbind().one("JSON_LOADED",saveResult).one("SYS_ERROR",errorBack);			
+			Loader.POSTDATA("php/equip/InsertOrUpdateRwd_web.php",postData);
+		}
+	}
+}
+</script>
+<style type="text/css">
+#mapTemp.layoutBlock {
+	background-color: #FFF;
+	padding: 10px;
+}
+</style>
+<!--内容部分start-->
+<!--表单-->
+
+<div id="framelayout" data-option="{'frameSet':'layoutFlex'}">
+  <div id="formTemp" class="layoutBlock" data-option="{'layoutType':'fixed','size':400,'scrollY':true}" style="background-color: #fff;overflow-y: auto">
+    <div class="formBox" style="background-color: #fff;overflow-y: auto">
+      <form id="Form">
+        <input name="kdid"  type="hidden"  style="width:200px" />
+        <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab">
+          <tr>
+            <th align="right" width="100"><i>点位名称</i></th>
+            <td><input name="kdmc"  type="text" class="must"  style="width:200px" /></td>
+          </tr>
+          <!-- 
+      <tr>
+        <th align="right"><i>巡逻时间</i></th>
+        <td><input style="width:200px"  class="fm_datepartinput must"  value=""  data-option="{'data':'h,t','force2':true,'fast':false}"  name="kdsj" type="text"/>
+         </td>
+      </tr>
+      <tr>
+        <th align="right"><i>间隔时间（秒）</i></th>
+        <td><input name="jgsj"  type="text"  class="check_length check_uint must"  style="width:200px" value="3600" maxlength="12" minlength="1"/></td>
+      </tr>
+      <tr>
+      <tr>
+        <th align="right"><i>应打次数</i></th>
+        <td><input name="ydcs"  type="text"  class="check_length check_uint must"  style="width:200px" value="1" maxlength="5" minlength="1"/></td>
+      </tr>
+      -->
+          <tr>
+            <th align="right"><i>点位坐标</i></th>
+            <td><input name="geometry"  type="hidden"  style="width:200px" />
+              <input name="actionPosition"  type="text" class="fm_leaveit must"   style="width:200px" readonly="readonly" />
+              <a  id="positionBtn" class="but-small but-green">地图选点</a></td>
+          </tr>
+        </table>
+      </form>
+      
+      <!--巡逻时间段模板--11.18-->
+      <div class="pageSubtitle">巡逻时段设置</div>
+      <div class="fm_autoAddForm">
+        <form class="contBlock" style="visibility:visible;margin-left:6px;margin-right:6px">
+          <input type="hidden" name="xlid" id="xlid"/>
+          <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab ">
+            <tr>
+              <th width="130" align="right"><i>巡逻时间</i></th>
+              <td><input  name="kdsj" type="text"  class="fm_datepartinput must" id="kdsj" style="width:200px" value=""  data-option="{'data':'h,t','force2':true,'fast':false}"/></td>
+              <td width="64" align="right"><a class="but-small but-orange delbut" ><i class="fa fa-remove"/>删除</a></td>
+            </tr>
+            <tr>
+              <th align="right"><i>巡逻次数</i></th>
+              <td colspan="2"><input name="ydcs"  type="text"  class="check_length check_uint must"  style="width:200px" value="1" maxlength="5" minlength="1" id="ydcs"/></td>
+            </tr>
+            <tr>
+              <th align="right"><i>间隔时间（秒）</i></th>
+              <td colspan="2"><input name="jgsj"  type="text" class="must"  style="width:200px" maxlength="5" minlength="4" title="单位：秒" id="jgsj"/>
+                秒</td>
+            </tr>
+          </table>
+        </form>
+      </div>
+    </div>
+  </div>
+  
+  <!--地图-->
+  <div id="mapTemp" class="layoutBlock" data-option="{'layoutType':'flex','flex':'1'}" style="background-color: #eee">
+    <div class="searchBox">
+      <form id="searchForm">
+        <input type="hidden" value="1" name="id">
+        <table border="0" cellspacing="0" cellpadding="3">
+          <tr>
+            <td><ul>
+                <li> <i>起始时间:</i>
+                  <input style="width: 160px" class="fm_dateinput must" value=""
+									data-option="{'data':'y,m,d','force2':true}"
+									name="starttime" type="text" />
+                </li>
+                <li> <i>结束时间:</i>
+                  <input style="width: 160px" class="fm_dateinput must" value=""
+									data-option="{'data':'y,m,d','force2':true}"
+									name="endtime" type="text" />
+                </li>
+                <li> <i>部门:</i>
+                  <input  type="text" name="orgCode" id="orgCode"  style="width:160px" class="fm_popOutSelect" data-option="{'url':'pages/treeSelector_NoCascade.html','title':'部门','width':520,'height':400,'mulit':false,'locksize':true}"/>
+                </li>
+              </ul>
+              <div class="cl"></div></td>
+            <td width="65" valign="top"><a id="searchButton" class="but-small but-red"><i
+							class="fa fa-search"></i> 查询</a></td>
+          </tr>
+        </table>
+      </form>
+    </div>
+    <div id="mainMapFroSelect" style="background-color:#fff">地图</div>
+  </div>
+  <div id="footTemp" data-option="{'layoutType':'side','size':'36','position':'bottom'}"> 
+    <!--提交按钮-->
+    <div class="submitButs"><a class="but-normal but-green" id="addTimepart"><i class="fa fa-plus"/>增加巡逻时间段</a><a  id="saveButton" class="but-normal but-red"><i class="fa fa-save"></i> 保存</a> <a  id="cancelButton" class="but-normal but-yellow"> <i class="fa fa-reply"></i> 取消</a></div>
+  </div>
+</div>
+<!--内容部分end-->

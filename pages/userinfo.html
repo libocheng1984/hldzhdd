@@ -1,0 +1,74 @@
+<script type="text/javascript"><!--
+function ACTION(){
+	var p=this;
+	
+	this.READY=function(){
+		//快捷按钮			
+		var uinfoIcon=$('<div class="usericon" draggable="true"><i class="fa fa-th-list"></i></div>');
+		$("body").append(uinfoIcon);
+		var UinfoDrag=new dragDivObj();
+		UinfoDrag.install(uinfoIcon,uinfoIcon);			
+		p.find("#logOutBut").bind("click",logOut);//退出按钮		
+		p.find("h1.close").bind("click",showUserPanel);
+		uinfoIcon.bind("click",showUserPanel);	
+		debugger;
+		if(userData["userName"]){
+			p.find("#orgName").text(userData.orgName);
+			p.find("#userName").text(userData.userName);
+		}else{
+			$(document).unbind("addUserInfoData");
+			$(document).one("addUserInfoData",function(e,data){
+				p.find("#orgName").text(data.orgName);
+				p.find("#userName").text(data.userName);
+			});
+		}
+		
+		//新增版本信息		
+		p.find(".about").html('<p>'+projectTitle+'</p><p>版本：<span>'+projectVer+'</span></p><p>'+projectCopyRight+'</p>').hide();
+		p.find(".userMenu .aboutbut").bind("click",function(){
+			if(p.find(".about").hasClass("open")){
+				p.find(".about").slideUp();	
+				p.find(".about").removeClass("open");
+			}else{
+				p.find(".about").slideDown();	
+				p.find(".about").addClass("open");
+			}
+		})	
+		//--end
+	}
+	
+	function showUserPanel(){
+		var Upanel=p.WRAPER;	
+		if(Upanel.hasClass("open")){
+			Upanel.removeClass("open"); 
+			//MAINMENU.show();
+		}else{
+			Upanel.addClass("open"); 
+			//MAINMENU.hide();
+		}
+	}
+	
+	/*
+	function logOut(){
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){	
+		})
+		Loader.POSTDATA("php/system/Logout.php",{"event":"","content":{},"extend":{}});
+	}
+	*/
+}
+--></script>
+<h1 class="close"><i class="fa fa-chevron-circle-right"></i></h1>
+<div class="usercontent" >
+  <div class="uface"> <i class="fa fa-user"></i>
+    <p id="orgName">欢迎</p>
+     <p id="userName"></p>
+    <a class="but-normal but-greenlight" id="logOutBut">退出</a> </div>
+  <div class="userMenu">
+    <p><a><i class="fa fa-flag"></i> 公告</a></p>
+    <p><a><i class="fa fa-question-circle"></i> 帮助</a></p>
+    <p><a><i class="fa fa-download"></i> 下载</a></p>
+    <p class="aboutbut"><a><i class="fa fa-info-circle"></i> 关于</a></p>
+  </div>
+  <div class="about"></div>
+</div>

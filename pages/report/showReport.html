@@ -1,0 +1,46 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	var iframeObj;//iframe对象
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		p.find(".iframeBox").height(p.WRAPER.height());
+		if(iframeObj){
+			iframeObj.resize();
+		}				
+	}	
+	
+	this.DESTROY=function(){ 
+		if(iframeObj){
+			iframeObj.destroy();//销毁iframe
+			iframeObj=null;	
+		}
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);		
+	}
+	
+	this.READY=function(){
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+		var url = p.CONDITION.url;
+                //alert(JSON.stringify(p.CONDITION));
+		//iframe例子------------------------------------------		
+		iframeObj=new IframeObj(p.find(".iframeBox"),url);	
+		//iframe例子------------------------------------------
+		
+		//更新一下尺寸
+		p.resize();	
+	}	
+}
+
+
+</script>
+<!--内容部分start-->
+<!--iframe-->
+<div class="iframeBox"></div>
+<!--内容部分end--> 
+

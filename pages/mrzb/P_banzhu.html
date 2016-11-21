@@ -1,0 +1,213 @@
+<script type="text/javascript">
+function ACTION(){
+	var p=this;	
+	var TABBox;
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		p.find(".datalist").height(p.WRAPER.height()-p.find(".pageTopBox").outerHeight(true));   
+		listObj.datagrid("resize"); 
+	}
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){  
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+		
+		//表单处理
+		SearchForm=new formDeal(p.find("#searchForm"));//创建表单
+		SearchForm.parse(function(){
+			SearchForm.bindData(p.CONDITION);//绑定默认查询条件	
+		});//格式化表单	
+		
+		listObj=p.find("#tt");
+		
+		//表格例子------------------------------------------
+		var clumoption=[[
+			{field:'id',title:'编号',width:40,fixed:true,align:"center",checkbox:true},
+			{field:'zbzdh',title:'班组名称',width:"20%",resizable:false,align:"center"},
+			{field:'zzxm',title:'值班长',width:100,align:'left'},
+			{field:'zyxm',title:'班组成员',width:"60%"}			
+			]];
+		listObj.datagrid({
+			url:"php/mrzb/bzList.php",
+			queryParams:{"guid":"asjdhasjd3434343","event":"SEARCH_LIST"}, //附加参数对象
+			loadFilter:formatHostJson,  //格式过滤器
+			fit:true,
+			remoteSort:false,
+			showFooter:true,//显示总计??
+			rownumbers:true,//行号
+			singleSelect:false,
+			fitColumns:true,//宽度自适应
+			striped:true,//条纹
+			pagination:true,//分页
+			pageSize:20,
+			pageList:[20,30,40,50,60,100],
+			onRowContextMenu:rightClickShowMsg,//右键菜单
+			onDblClickRow:dataGridClick,
+			columns:clumoption
+		}).datagrid('getPager').pagination({  //设置显示列切换按钮
+				buttons:[{
+					iconCls:'icon-clumconfig',
+					handler:function(){ClumChocie(p.find('#tt'),$(this));return false;}
+				}]
+		})		
+		//安装按钮点击事件
+		p.find(".actionBox a").bind("click",butAction);				
+			
+		//绑定查询按钮点击
+		p.find("#searchButton").bind("click",StartSearch);		
+		p.find("#clearButton").bind("click",function(){
+			SearchForm.clear();//清除查询表单条件
+			StartSearch();	//重新查询
+		})
+		//更新一下尺寸，注意执行时间点，一般放在最后
+		p.resize();		
+	}
+	
+	//datagrid行点击
+	function dataGridClick(rowIndex,rowData){ 
+		var tr=$.getDatagridTr(listObj,rowIndex); 
+		WINDOW.open({"name":"zbzdh","title":"班组信息","width":800,"height":0.8,"url":"pages/mrzb/P_banzhudetail.html","lock":true},$.extend({"parentId":p.WINID},rowData),tr);
+	}
+	
+	//右键菜单
+	function rightClickShowMsg(e,rowIndex,rowData){
+		var pos=[e.clientX,e.clientY]; 
+		var msg=$('<p class="banzuRightMenu" align="center">'+
+						   '<a class="but-small but-red" id="banzhuEdit">修改班组</a>'+
+						   '<a class="but-small but-green" id="paiban">排班安排</a>'+
+						   '</p>');
+		$.tips(pos,"right",msg,[100]);
+		msg.find("a").one("click",function(){
+			switch($(this).attr("id")){	
+				case "banzhuEdit":		
+					WINDOW.open({"name":"BANZHUXIUGAI","title":"修改班组","width":600,"height":400,"url":"pages/mrzb/P_banzhuform.html","lock":true},$.extend({"parentId":p.WINID},rowData),$(this));
+					break;
+				case "paiban":
+					WINDOW.open({"name":"BANZHUPAIBAN","title":"班组排班 _ "+rowData["zbzdh"],"width":800,"height":0.9,"url":"pages/mrzb/P_paibanbiao.html","lock":true},$.extend({"parentId":p.WINID},rowData),$(this));
+					break;
+			}
+			$.closetips();//关闭tip消息
+		})	
+		e.preventDefault();
+	}
+	
+	function butAction(){
+		var but=$(this);
+		switch(but.attr("id")){
+			case "addNew":
+				WINDOW.open({"title":"新建班组","width":600,"height":400,"url":"pages/mrzb/P_banzhuform.html","lock":true},{"parentId":p.WINID},$(this));
+				break;
+			case "removeSelected":				
+				dealRows("DELETE","确定删除选中班组吗?");
+				break;
+		}
+	}
+	
+	//行处理
+	function dealRows(pevent,msg){		
+		var selectedRow=listObj.datagrid("getChecked");
+		var ids="";
+		for(var i=0;i<selectedRow.length;i++){
+			ids+=selectedRow[i]["id"]+","
+		}
+		if(ids.length>0){
+			ids=ids.substr(0,ids.length-1);
+		}else{
+			$.alert("请选择!");
+			return;
+		}
+		var next=function(type){
+			if(type){
+				updateRow(pevent,ids);
+			}
+		}
+		$.confirm(msg,next)
+	}	
+	
+	function updateRow(pevent,ids){
+		if(!ids){
+			$.alert("请选择!");
+			return;
+		}
+		var Loader=new AJAXObj();
+		$(Loader).one("JSON_LOADED",p.refresh);
+		var postdata={"event":pevent,
+								"content":{
+											"condition":{"ids":ids}
+											}
+								};
+		Loader.Post("php/mrzb/deletezbz.php",postdata);
+	}	
+	
+	//查询
+	function StartSearch(){
+		if(SearchForm.check()){ //数据校验
+			var searchCondition=SearchForm.getData();//获取表单条件
+			//刷新DataGrid
+			var searchParam=$.extend({"event":"SEARCH_LIST"},searchCondition);
+			listObj.datagrid("reload",searchParam) //附加参数对象);
+		}
+	}
+	
+	//子窗口刷新父页面组件
+	this.refresh=function(){
+		listObj.datagrid("reload");
+	}
+}
+</script>
+
+<!--内容部分start-->
+<style type="text/css">
+.banzuRightMenu {
+	padding:0px;
+	margin:0px;
+}
+.banzuRightMenu a{
+	display: block;
+	margin: 2px;
+}
+</style>
+
+<div class="pageTopBox">
+  <div id="dataGridActionBox"  style="padding:3px" > 
+    <!--按钮-->
+    <div style="margin-bottom:3px" class="actionBox">
+    <span class="helpLine fr"><i class="fa fa-question-circle"/>双击列表记录查看班组详情，右键点击列表记录可编辑班组或值班表</span>
+    <a class="but-small but-green" id="addNew"><i class="fa fa-plus"></i>新建班组</a>
+    <a class="but-small but-green" id="removeSelected"><i class="fa fa-user-times"></i>删除</a>   
+    </div>
+  </div>
+  <!--查询-->
+  <div class="searchBox">
+    <form id="searchForm">
+      <table border="0" cellspacing="0" cellpadding="3" width="100%">
+        <tr>
+          <td><ul>              
+              <li> <i>班组名称:</i>
+                <input  type="text" name="bzmc" style="width:120px" />
+              </li>
+              <li> <i>班组长:</i>
+                <input  type="text" name="zzxm" style="width:120px" />
+              </li>              
+            </ul>
+            <div class="cl"></div></td>
+          <td width="93" align="right" valign="top" nowrap="nowrap"><a  id="searchButton" class="but-small but-red"><i class="fa fa-search"></i> 查询</a><a  id="clearButton" class="but-small but-compact but-yellow"><i class="fa fa-undo"></i></a></td>
+        </tr>
+      </table>
+    </form>
+  </div>
+</div>
+<!--表格-->
+<div class="datalist" id="tabcont">
+  <div id="tt"> </div>
+</div>
+<!--内容部分end--> 
+
+
+
+

@@ -1,0 +1,145 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行READY方法，代替document.ready执行
+//重要：写在ACTION外的方法是全局方法，尽量不要这么干，以免方法冲突。
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//重要：页面关闭的时候会尝试执行DESTROY方法，请在这里解除事件绑定，销毁对象，以免窗体残留。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+//重要：保证标签完整闭合，否则IE8报错 “ACTION_Window_1426578029038953”未定义
+function ACTION(){
+	var p=this;	
+	var processRecord = null;
+	var feedBackRecord = null;
+	var record = {};
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){ 
+		p.find(".datalist").height(p.WRAPER.height()-p.find(".pageTopBox").outerHeight(true)); 
+		p.find("#tt").datagrid("resize"); 
+	}
+	
+	var SearchForm;
+	
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){
+		processRecord = p.CONDITION['record'];
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+		
+		
+		SubmitForm=new formDeal(p.find("#Form"));
+		$(SubmitForm).one("HTML_FORMATED",getFormData);//绑定格式化完成事件，执行下一步
+		SubmitForm.parse();
+		//更新一下尺寸
+		p.resize();
+	}
+	
+	//编辑状态，获取数据
+	function getFormData(){ 
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){ //alert(backJson)
+			feedBackRecord= backJson["value"]['records'];
+			//alert(JSON.stringify(feedBackRecord));
+			$.extend(record,processRecord,feedBackRecord)
+			SubmitForm.bindData(record);//绑定数据	
+                        if(feedBackRecord.zp)
+                        {
+                            p.find("#imgTd").changeValue("../../zhdd/php/ajfx/AjJpg.php?imageid="+feedBackRecord.zp.replace(/\,/g, ",../../zhdd/php/ajfx/AjJpg.php?imageid=" ));
+                        }
+                        if(feedBackRecord.yy)
+                        {
+                           p.find("[name=imgAudio]").changeValue("../../zhdd/php/ajfx/Ajmp3.php?imageid="+feedBackRecord.yy);
+                        }
+                        if(feedBackRecord.sp)
+                        {
+                           p.find("[name=video]").changeValue("../../php/ajfx/AjMp4.php?imageid="+feedBackRecord.sp);
+                        }
+			//feedBackData();		
+		})
+		Loader.POSTDATA("php/ajfx/getIntelligenceDetailed.php",{"event":"FormEdit","content":{"condition":{"guid":processRecord['guid']}},"extend":{}});				
+		p.find("#cancelButton").bind("click",function(){ 
+			WINDOW.	close(p.WINID);//关闭窗口
+		});
+	}
+	/*
+	function feedBackData(){
+		var Loader_resouce=new AJAXObj();
+		$(Loader_resouce).bind("JSON_LOADED",function(e,backJson){	
+			var records= backJson["value"]['records'];
+			//alert("111");
+			if(records.length>0){
+				var imgObj = "";
+				var andioObj = "";
+				for(var i=0;i<records.length;i++){
+					//console.log(records[i]['zylx']);
+					if(imgObj==""&&records[i]['zylx']=="1"){
+						imgObj+=records[i]['zydz'];
+						continue;
+					}else if(andioObj==""&&records[i]['zylx']=="2"){
+						andioObj+=records[i]['zydz'];
+						continue;
+					}
+					
+					if(records[i]['zylx']=="1"){
+						imgObj+=","+records[i]['zydz'];
+					}else if(records[i]['zylx']=="2"){
+						andioObj+=","+records[i]['zydz'];
+					}
+				}
+				//alert(andioObj);
+				p.find("#imgTd").changeValue(imgObj); //alert(p.find("#imgAudio").length)
+				p.find("[name=imgAudio]").changeValue(andioObj);
+			}
+		})
+		Loader_resouce.POSTDATA("php/event/GetFile_web.php",{"event":"FormEdit","content":{"condition":{"zlbh":processRecord['zlbh'],"cjdbh":processRecord['cjdbh']}},"extend":{}});
+	}
+        */
+
+}
+</script>
+
+<!--内容部分start-->
+<!--表格-->
+<div class="formBox">
+  <form id="Form">
+    <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+	  <!-- 反馈信息 -->
+	  <!-- start -->
+	   <tr>
+	    <th align="right"><i>图片</i></th>
+	    <td colspan="3"><div class="fm_uploadPicsShow uppicbox" data-option="{'rel':'xyzd','editable':false}"></div>
+          <input  type="hidden" name="xyzd" id="imgTd"  /></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>语音</i></th>
+	    <td colspan="3" id="imgYx"> <input  type="text" name="imgAudio" class="fm_voicePlay" /></td>
+	  </tr>
+          <tr>
+	    <th align="right"><i>视频</i></th>
+	    <td colspan="3" id="videox"> <input  type="text" name="video"  class="fm_videoPlay"  data-option="{'width':640,'height':480}"/></td>
+	  </tr>
+      <tr>
+        <th width="20%" align="right"><i>证件号码</i></th>
+		<td><span id="zjhm"></span></td>
+        <th width="20%" align="right"><i>姓名</i></th>
+		<td><span id="username"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>所属部门</i></th>
+		<td><span id="orgname"></span></td>
+        <th align="right"><i>描述</i></th>
+		<td><span id="content"></span></td>
+      </tr>
+      
+     
+	  <!-- end -->
+  </table>
+  </form>
+</div>
+<!--内容部分end--> 
+<div class="submitButs"><a  id="cancelButton" class="but-normal but-greenlight"> <i class="fa fa-reply"></i> 返回</a></div>
+
+

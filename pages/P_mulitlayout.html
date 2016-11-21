@@ -1,0 +1,361 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	var pageoption={
+		"wraper":[
+				{"width":300,"class":"layout_fixdWraper","id":"fixdWraper","drag":true},
+				{"width":1,"class":"layout_contentWraper","id":"contentWraper"}
+			],
+			"pannal":[
+				{"width":500,"closew":10,"dir":"right","zindex":3,"class":"layout_slideWraper","id":"slideWraper"}
+			],		
+			"openslide":"mouseenter","closeslide":"click",
+			"minContWidth":200
+		};
+	var MulitContainer;
+	var DataGrid;
+	var MapContainer;
+	var TABBox;
+	
+	//表单对象
+	var Detailobj;
+	var detailAccBox;
+	var chuJingDan;
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		var H=p.WRAPER.height()-p.find(".titleWraper").outerHeight(true); 
+		p.find("#layout").setRealSize(null,H);		
+		MulitContainer.resize();
+		MapContainer.find("#smallMapForJingQing").fillParent();
+		if(TABBox){
+			TABBox.resize();
+		}		
+		if(DataGrid){
+			DataGrid.datagrid("resize");
+		}	
+	}	
+	
+	this.DESTROY=function(){ 
+		if(TABBox){
+			TABBox=null
+		}		
+		if(DataGrid){
+			DataGrid=null;
+		}
+		if(MulitContainer){
+			MulitContainer.destroy();
+			MulitContainer=null;	
+		}
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);		
+		MulitContainer=new fixFreeLayout(p.find("#layout"),pageoption);		
+		MapContainer=MulitContainer.getContainerById("contentWraper");
+		
+		//插入地图容器
+		MapContainer.append($('<div id="smallMapForJingQing"></div>'));				
+		//安装表格
+		var dataGridContainer=MulitContainer.getContainerById("slideWraper");		
+		dataGridContainer.append(p.find(".fm_tabBox")).append(p.find("#tabcont"));
+		DataGrid=dataGridContainer.find("#datalist");
+		
+		//安装TAB组件	(tab标签容器,对应标签的内容容器)
+		TABBox=new Tabs(p.find(".fm_tabBox"),p.find("#tabcont"));
+		$(TABBox).bind("TAB_CLICK",function(e,Vars){ //绑定tab标签点击事件	
+			var option=Vars["tabItem"].getDataOptions();//获得按钮参数
+			DataGrid.datagrid("reload",option);//更新表格
+		}).bind("TAB_RESIZE",function(e,size){ //绑定tab布局resize事件
+			p.find(".datalist").height(size.h);	
+			DataGrid.datagrid("resize"); 
+		})
+		$(MulitContainer).bind("SLIDE_RESIZE",TABBox.resize);//滑开重置FOR IE9
+		
+		
+		//表格------------------------------------------EasyUI组件  	
+		var clumoption=[[
+			{field:'name',title:'名称',width:100,resizable:false,align:"center",formatter: function(value,row,index){
+				if (value){
+					return '<span class="alertflash hotpoint"></span>'+value;
+				}
+			}},
+			{field:'addr',title:'价格',width:80},
+			{field:'col4',title:'其他',width:180,align:'left'}		
+			]];
+		DataGrid.datagrid({
+			url:"host/datagrid_data4.asp",
+			queryParams:{"guid":"asjdhasjd3434343"}, //附加参数对象
+			loadFilter:formatHostJson,  //格式过滤器
+			fit:true,
+			showFooter:false,//显示总计
+			rownumbers:true,//行号
+//			singleSelect:false,//单选
+			fitColumns:true,//宽度自适应
+			striped:true,//条纹
+			pagination:true,//分页
+			onClickRow:function(){
+				MulitContainer.closePannalById("slideWraper");
+			},
+			columns:clumoption
+		})		
+		
+		//安装左侧
+		LeftContainer=MulitContainer.getContainerById("fixdWraper");
+		LeftContainer.append(p.find(".detailBox"));
+		//表单格式化处理
+		Detailobj=new  formDeal(p.find("#Detail"));// detailDeal(p.find("#Detail"));
+		$(Detailobj).one("HTML_FORMATED",getFormData);//绑定格式化完成事件，执行下一步
+		Detailobj.parse();	
+		
+		//表单例子------------------------------------------		
+		//创建处警单对象
+		chuJingDan=new ChuJingAction(p.find("#part_2"));		
+		//创建折叠对象
+		detailAccBox=new AccordionFrame(p.find(".zediewindow"),false);//折叠展开设置,true,false是否只保留一个展开		
+		detailAccBox.disableBar(1,true,"（尚无处警单）");//禁止第2个展开
+		detailAccBox.disableBar(2,true,"（尚无反馈）");//禁止第3个展开
+		//展开加载事件
+		$(detailAccBox).bind("ACC_LOAD",function(e,Vars){
+			switch(Vars["id"]){
+				case "part_2":
+					//处警单局部加载-----
+					getFormData_CJD(Vars["callback"])
+					break;
+				case "part_3":
+					//局部加载，加载反馈-----
+					
+					//完成后回调展开
+					Vars["callback"]();
+					break;
+			}
+		})
+		
+		//更新一下尺寸
+		p.resize();		
+		
+		//安装地图
+		var point= new BMap.Point(121.619205,38.916041); 
+		var map = new BMap.Map("smallMapForJingQing");
+		map.centerAndZoom(point, 15);
+	}	
+	
+	//获取数据
+	function getFormData(){
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){			
+			Detailobj.bindData(backJson["value"]);//绑定数据			
+		})
+		Loader.POSTDATA("host/detail.asp",{"event":"FormEdit","content":{"condition":p.CONDITION},"extend":{}});				
+	}	
+}
+</script>
+<!--内容部分start-->
+<div class="titleWraper">重点关注警情</div>
+<div id="layout">布局容器</div>
+
+<!--附件内容-->
+<div class="detailBox">
+  <div class="zediewindow">
+    <div  data-option="{'title':'报警信息','open':true}" id="part_1">
+      <form id="Detail">
+        <div class="splittitle">接警信息</div>
+        <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+          <tr>
+            <th width="80" align="right"><i>开始时间</i></th>
+            <td><span id="starttime"/></td>
+          </tr>
+          <tr>
+            <th align="right"><i>结束时间</i></th>
+            <td><span id="endtime"/></td>
+          </tr>
+          <tr>
+            <th align="right"><i>开发语言</i></th>
+            <td><span id="kaifa"/></td>
+          </tr>
+          <tr>
+            <th align="right"><i>开发部门</i></th>
+            <td><input  type="text" name="language"  style="width:200px" class="fm_popOutSelect" data-option="{'url':'pages/treeSelector.html','width':600,'height':400,'param':{'guid':'123457'},'mulit':false}" /></td>
+          </tr>
+        </table>
+        <div class="splittitle">报警人信息</div>
+        <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab">
+          <tr>
+            <th width="80" align="right"><i>姓名</i></th>
+            <td><span id="name"/></td>
+          </tr>
+          <tr>
+            <th align="right"><i>证件类型</i></th>
+            <td><span id="cardtype"/></td>
+          </tr>
+          <tr>
+            <th align="right"><i>身份证</i></th>
+            <td><span id="idno"/></td>
+          </tr>
+          <tr>
+            <th align="right"><em>录入人</em></th>
+            <td><span id="user"/></td>
+          </tr>
+          <tr>
+            <th align="right">&nbsp;</th>
+            <td><a id="actionfankui" class="but-small but-yellow">警情反馈</a></td>
+          </tr>
+        </table>
+      </form>
+    </div>
+    <div data-option="{'title':'处警信息','open':false}"  id="part_2">
+   <!-- 处警单0 必须有-->
+      <div class="block" id="chujingdan_0">
+        <div class="blocktitle"><em>处警单号：</em><span id="bianhao">123456</span></div>
+          <p> <em>派警时间：</em><span id="shijian">2015-02-32 12:23:34 </span><em>状态：</em><span id="zhuangtai">完成</span></p>
+        <div class="blockPart" id="zhiling_0">
+          <h1><em>指令编号：</em>987654</h1>
+          <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+            <tr>
+              <th width="80" align="right"><i>姓名</i></th>
+              <td><span id="name"/></td>
+            </tr>
+            <tr>
+              <th align="right"><i>证件类型</i></th>
+              <td><span id="cardtype"/></td>
+            </tr>
+            <tr>
+              <th align="right"><i>身份证</i></th>
+              <td><span id="idno"/></td>
+            </tr>
+            <tr>
+              <th align="right"><em>录入人</em></th>
+              <td><span id="user"/></td>
+            </tr>
+          </table>
+        </div>
+        <div class="blockPart">
+          <h1><em>指令编号：</em>987654</h1>
+          <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+            <tr>
+              <th width="80" align="right"><i>姓名</i></th>
+              <td><span id="name"/></td>
+            </tr>
+            <tr>
+              <th align="right"><i>证件类型</i></th>
+              <td><span id="cardtype"/></td>
+            </tr>
+            <tr>
+              <th align="right"><i>身份证</i></th>
+              <td><span id="idno"/></td>
+            </tr>
+            <tr>
+              <th align="right"><em>录入人</em></th>
+              <td><span id="user"/></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+      
+      <!-- 处警单1-->
+      <div class="block">
+        <div class="blocktitle"><em>处警单号：</em>123456
+        </div>
+        <p> <em>派警时间：</em>2015-02-32 12:23:34 <em>状态：</em>完成</p>
+        <div class="blockPart">
+          <h1><em>指令编号：</em>987654</h1>
+          <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+            <tr>
+              <th width="80" align="right"><i>姓名</i></th>
+              <td><span id="name"/></td>
+            </tr>
+            <tr>
+              <th align="right"><i>证件类型</i></th>
+              <td><span id="cardtype"/></td>
+            </tr>
+            <tr>
+              <th align="right"><i>身份证</i></th>
+              <td><span id="idno"/></td>
+            </tr>
+            <tr>
+              <th align="right"><em>录入人</em></th>
+              <td><span id="user"/></td>
+            </tr>
+          </table>
+        </div>
+        <div class="blockPart">
+          <h1><em>指令编号：</em>987654</h1>
+          <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+            <tr>
+              <th width="80" align="right"><i>姓名</i></th>
+              <td><span id="name"/></td>
+            </tr>
+            <tr>
+              <th align="right"><i>证件类型</i></th>
+              <td><span id="cardtype"/></td>
+            </tr>
+            <tr>
+              <th align="right"><i>身份证</i></th>
+              <td><span id="idno"/></td>
+            </tr>
+            <tr>
+              <th align="right"><em>录入人</em></th>
+              <td><span id="user"/></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div data-option="{'title':'处警反馈','open':false}"  id="part_3">
+     <div class="splittitle">案件反馈信息</div>
+      <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+        <tr>
+          <th width="80" align="right"><i>开始时间</i></th>
+          <td><span id="starttime"/></td>
+        </tr>
+        <tr>
+          <th align="right"><i>结束时间</i></th>
+          <td><span id="endtime"/></td>
+        </tr>
+        <tr>
+          <th align="right"><i>开发语言</i></th>
+          <td><span id="kaifa"/></td>
+        </tr>
+        <tr>
+          <th align="right"><i>开发部门</i></th>
+          <td><span id="language"/></td>
+        </tr>
+      </table>
+       <div class="splittitle">消防反馈信息</div>
+      <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+        <tr>
+          <th width="80" align="right"><i>开始时间</i></th>
+          <td><span id="starttime"/></td>
+        </tr>
+        <tr>
+          <th align="right"><i>结束时间</i></th>
+          <td><span id="endtime"/></td>
+        </tr>
+        <tr>
+          <th align="right"><i>开发语言</i></th>
+          <td><span id="kaifa"/></td>
+        </tr>
+        <tr>
+          <th align="right"><i>开发部门</i></th>
+          <td><span id="language"/></td>
+        </tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!--tab标签-->
+ <div class="fm_tabBox"  data-option="{'position':'left','width':120,'default':2}"> 
+ <a data-option="{'type':'1'}">未接收</a><a data-option="{'type':'2'}">已接手</a><a  data-option="{'type':'3'}">处理中</a><a  data-option="{'type':'4'}">已完成</a><a data-option="{'type':'1'}">未接收</a><a data-option="{'type':'2'}">已接手</a><a  data-option="{'type':'3'}">处理中</a><a  data-option="{'type':'4'}">已完成</a> 
+ </div>
+ <!--表格-->
+<div class="datalist" id="tabcont">
+  <div id="datalist"> </div>
+</div>
+<!--内容部分end--> 

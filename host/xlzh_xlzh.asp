@@ -1,0 +1,21 @@
+{
+      "head":{"code":1,"message":""},     
+      "value":[{
+                "value":1,
+                "text":"巡逻组合1"
+            },{
+                "value":2,
+                "text":"巡逻组合2"
+            },{
+                "value":3,
+                "text":"巡逻组合3"
+                
+            },{
+                "value":4,
+                "text":"巡逻组合4"
+            },{
+                "value":5,
+                "text":"巡逻组合5"
+            }],
+      "extend":{}
+}

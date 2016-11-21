@@ -1,0 +1,451 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行READY方法，代替document.ready执行
+//重要：写在ACTION外的方法是全局方法，尽量不要这么干，以免方法冲突。
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//重要：页面关闭的时候会尝试执行DESTROY方法，请在这里解除事件绑定，销毁对象，以免窗体残留。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+//重要：保证标签完整闭合，否则IE8报错 “ACTION_Window_1426578029038953”未定义
+function ACTION(){
+	var p=this;
+	
+	var clumoptionRen;
+	var clumoptionChe;	
+	var editCheckRowindex;
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){ 	
+	
+	//console.log(p.WRAPER.height(),p.CONTAINER.height(),p.find(".pageTopBox").outerHeight(true),".......")	
+		p.find("#table1 td>div.wraper1").height(p.WRAPER.height()-p.find(".pageTopBox").outerHeight(true)).width(Math.floor(p.WRAPER.width()*0.35)); 	
+                p.find("#table1 td>div.wraper2").height(p.WRAPER.height()-p.find(".pageTopBox").outerHeight(true)).width(Math.floor(p.WRAPER.width()*0.65)); 	
+		p.find("#tt").datagrid("resize"); 
+		p.find("#tt2").datagrid("resize");
+	}
+	
+	var SearchForm;
+	
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+		
+		//表单处理
+		SearchForm=new formDeal(p.find("#searchForm"));
+		SearchForm.parse();
+		SearchForm.bindData(p.CONDITION);//绑定默认条件
+		//初始化查询文本框赋值
+		p.find("#orgCode_text").val(userData.orgName);
+		
+		//return	
+
+		//表格例子------------------------------------------EasyUI组件
+		
+		clumoptionRen=[[
+			
+			
+			{field:'id',title:'ID',width:"35%"},
+			{field:'name',title:'姓名',width:"13%"},
+			{field:'orgName',title:'部门',width:"30%"},
+			{field:'opt',title:'操作',width:"14%",align:'center',  
+            formatter:function(value,record,index){  
+                var btn = "<a class='but-small but-red DeleteDutyEquip' id='"+record.id+"'>删除</a>";  
+                return btn;  
+            }  
+        } 
+			]];
+			
+			
+		clumoptionChe=[[
+			
+			
+			{field:'id',title:'ID',width:"27%"},
+			{field:'name',title:'车牌号',width:"20%"},
+			{field:'orgName',title:'部门',width:"31%"},
+			{field:'opt',title:'操作',width:"14%",align:'center',  
+            formatter:function(value,record,index){  
+                var btn = "<a class='but-small but-red DeleteDutyEquip' id='"+record.id+"'>删除</a>";  
+                return btn;  
+            }  
+        } 
+			]];
+			
+		
+		p.find("#tt").datagrid({
+			url:"php/equip/GetModel_web.php",		
+			queryParams:{"event":"FormEdit","content":JSON.stringify({"condition":{"orgCode":userData.orgCode,"type":"1"}}),"extend":{}}, //附加参数对象
+			//loadFilter:formatCommonJson,  //江岸过滤器
+			loadFilter:formatHostJson,
+			fit:true,
+			showFooter:true,//显示总计??
+			rownumbers:true,//行号
+			singleSelect:true,
+			fitColumns:true,//宽度自适应
+			striped:true,//条纹
+			pagination:true,//分页
+//			onDblClickRow:dataGridClick,
+			onClickRow:dataGridClick,
+			columns:clumoptionChe,
+			onLoadSuccess:function(data){
+				p.find(".DeleteDutyEquip").bind("click",DeleteDutyEquip);
+				p.find("#tt").datagrid('getPager').pagination({  //设置显示列切换按钮
+				buttons:[{
+					iconCls:'icon-clumconfig',
+					handler:function(){ClumChocie(p.find('#tt'),$(this))}
+				}]
+			 })
+		   }
+		})
+		
+		
+		var clumoptionZb=[[
+			
+			
+			{field:'CHECK',title:'复选框',checkbox:true},
+			{field:'lbmc',title:'装备名称',width:"35%"},
+			{field:'zbbm',title:'装备编码',width:"25%"},
+			{field:'lbdw',title:'单位',width:"10%"},
+                        {field:'zbsl',title:'剩余数量',width:"10%"},
+                        {field:'bdsl',title:'绑定数量',width:"10%",editor:{type:"numberbox",options:{max:9999999999,min:1,precision:0}}},
+			{field:'lbms',title:'装备描述',width:"10%"}
+			]];
+		p.find("#tt2").datagrid({
+			url:"php/equip/GetEquipment_web.php",		
+			queryParams:{"event":"FormEdit","content":JSON.stringify({"condition":{"orgCode":userData.orgCode}}),"extend":{}}, //附加参数对象
+			loadFilter:formatCommonJson,  //格式过滤器
+			fit:true,
+			showFooter:true,//显示总计??
+			rownumbers:true,//行号
+			//singleSelect:true,
+			fitColumns:true,//宽度自适应
+			striped:true,//条纹
+			//pagination:true,//分页
+			//onDblClickRow:dataGridClick,
+//			onClick:dataGridClick,
+                         onClickCell:function(rowIndex, field, value){
+                                           if(field=="bdsl")
+                                           {
+						p.find('#tt2').datagrid('beginEdit', rowIndex);
+                                                editCheckRowindex=rowIndex;
+                                            }
+					
+				},
+                         onUncheck:function(rowIndex,rowData){
+                             if(editCheckRowindex!=null)
+                             {
+                                $('#tt2').datagrid('checkRow', editCheckRowindex);
+                                editCheckRowindex=null;
+                             }
+                         },
+			columns:clumoptionZb
+		})
+		
+		
+		//更新一下尺寸
+		p.resize();
+		
+		//安装按钮点击事件
+		p.find(".actionBox a").menuButton({"guid":"123456789","parentid":p.WINID});		
+		//绑定查询按钮点击
+		p.find("#searchButton").bind("click",StartSearch);	
+		p.find("#orgCode").bind("change",changeBm);
+		p.find("#type").bind("change",changeRc);
+		
+		//反馈信息事件
+		p.find("#cancelButton").bind("click",function(){ 
+			WINDOW.close(p.WINID);
+		});
+	}
+	
+	//datagrid行点击
+	function dataGridClick(rowIndex,rowData){ 
+	
+	var rowsZt = p.find('#tt').datagrid('getSelections');
+		if(rowsZt.length==0) {
+			$.alert("没有选择人或车");
+			return
+		}
+		var ztId = ""; 
+		for(var i=0; i<rowsZt.length; i++){
+		  ztId=rowsZt[i].id;
+		  break;
+		}
+	var postData={
+			"content":{"condition":{
+				"id":ztId
+				}}
+		};
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){
+			//alert(JSON.stringify(backJson));
+			readjson(backJson);
+		}); 
+		Loader.POSTDATA("php/equip/GetDutyEquip_web.php",postData);
+		 
+		 
+		
+	}
+	
+	//查询
+	function StartSearch(){
+		var rowsZt = p.find('#tt').datagrid('getSelections');
+		if(rowsZt.length==0) {
+			$.alert("没有选择人或车");
+			return
+		}
+		var ztId = ""; 
+		var ztorgCode = ""; 
+		var ztType = "";
+		ztType = p.find("#type").val();
+		for(var i=0; i<rowsZt.length; i++){
+		  ztId=rowsZt[i].id;
+		  ztorgCode=rowsZt[i].orgCode;
+		  break;
+		}
+		
+		var rows = p.find('#tt2').datagrid('getChecked');
+		if(rows.length==0) {
+			$.alert("没有选择装备");
+			return
+		}
+		for(var i=0; i<$('#tt2').datagrid('getRows').length; i++){
+				$('#tt2').datagrid('endEdit', i);//停止编辑
+		}
+		var arr = new Array();
+		//var dataZb = "[" 
+		for(var i=0; i<rows.length; i++){
+			var data = {};
+			data.zblb = rows[i].zblb;
+			data.zbbm = rows[i].zbbm;
+                        data.bdsl = rows[i].bdsl;
+                        //alert(data.bdsl);
+			arr.push(data);
+		//dataZb+="{'zblb':'"+rows[i].zblb+"','zbbm':'"+rows[i].zbbm+"'},";
+		}
+		//dataZb=dataZb.substring(0,dataZb.length-1)+"]";
+		var postData={
+			"content":{"condition":{
+				"orgCode":ztorgCode,
+				"id":ztId,
+				"type":ztType,
+				"equips":arr
+				}}
+		};
+
+		
+		//alert(JSON.stringify(postData));
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){
+                       if(backJson.head.message!=""&&backJson.head.message!='绑定成功')
+                       {
+                           $.error(backJson.head.message);
+                       }
+                       else
+                       {
+                            $.alert("绑定成功");
+                        }
+                        var records = backJson.records;
+                        if(records!=null&&records.length>0)
+                        {
+                            for(var i=0;i<records.length;i++)
+                            {
+                                for(var j=0;j<rows.length;j++)
+                                {  
+                                    if(records[i].zbbm==rows[j].zbbm)
+                                    {                                   
+                                        rows[j].zbsl = records[i].sysl;
+                                       $('#tt2').datagrid('updateRow',{ 
+                                        index: $('#tt2').datagrid("getRowIndex",rows[j]),
+                                        row: rows[j]
+                                     });
+                                    }
+                                }
+                            }
+                        }
+		}); 
+		Loader.POSTDATA("php/equip/UpdateOrAddModelEquip_web.php",postData);
+	
+		
+		
+	}
+	function changeBm(){
+		if(SearchForm.check()){ //数据校验
+			var formData =SearchForm.getData(); //数据校验
+		   if(p.find("#orgCode").val().length<1)
+		   {
+			   formData.orgCode=userData.orgCode;
+			   
+			   }
+			var searchCondition={"event":"FormEdit","content":JSON.stringify({"condition":formData}),"extend":{}};
+			;//获取表单条件
+			//刷新DataGrid
+			p.find("#tt").datagrid("reload",searchCondition);
+			p.find("#tt2").datagrid("reload",searchCondition);
+		}
+	}
+	function changeRc(){
+		
+		if(SearchForm.check()){ //数据校验
+			var formData =SearchForm.getData(); //数据校验
+		   if(p.find("#orgCode").val().length<1)
+		   {
+			   formData.orgCode=userData.orgCode;
+			   
+			   }
+			var searchCondition={"event":"FormEdit","content":JSON.stringify({"condition":formData}),"extend":{}};
+			;//获取表单条件
+			//刷新DataGrid
+			//alert(clumoption);
+			//alert(clumoption3);
+			p.find("#tt").datagrid("reload",searchCondition);
+			if(formData.type=="1")
+			{
+				p.find("#tt").datagrid({columns:clumoptionChe});
+			}
+			else
+			{
+				p.find("#tt").datagrid({columns:clumoptionRen});
+			}
+			delzb();
+			
+		}
+	
+		}
+		
+	
+			
+		
+       function readjson(objson) {
+            var jsondata = objson.value;
+			
+				//alert(jsondata[i].zbbm);
+				var rows = $('#tt2').datagrid('getRows');
+				for(var i=0; i<rows.length; i++){
+					$('#tt2').datagrid('uncheckRow', i);//不选中
+                                        $('#tt2').datagrid('endEdit', i);//停止编辑
+                                         rows[i].bdsl=0;
+                                         $('#tt2').datagrid('updateRow',{ 
+                                                            index: i,
+                                                            row: rows[i]
+                                                         });
+					for(var j=0;j<jsondata.length;j++)
+					{
+						if(jsondata[j].zblb==rows[i].zblb&&jsondata[j].zbbm==rows[i].zbbm)
+						{      
+                                                         rows[i].bdsl=jsondata[j].bdsl;
+                                                         $('#tt2').datagrid('updateRow',{ 
+                                                            index: i,
+                                                            row: rows[i]
+                                                         });
+							$('#tt2').datagrid('checkRow', i);
+						}
+                                              
+					}
+				
+				}
+			//alert(s);
+			
+            
+        }
+
+ function DeleteDutyEquip()
+  {
+	var ztId=$(this).attr("id");
+	
+	var postData={
+			"content":{"condition":{
+				"id":ztId
+				}}
+		};
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){
+			$.alert("删除成功");
+			//delzb();
+                       	var formData =SearchForm.getData(); //数据校验
+                        if(p.find("#orgCode").val().length<1)
+                         {
+			   formData.orgCode=userData.orgCode;
+			   
+			   }
+                        var searchCondition={"event":"FormEdit","content":JSON.stringify({"condition":formData}),"extend":{}};
+			;//获取表单条件
+			//刷新DataGrid
+			p.find("#tt2").datagrid("reload",searchCondition);
+		}); 
+		Loader.POSTDATA("php/equip/DeleteDutyEquip_web.php",postData);
+		 
+		 
+		
+	 
+  }
+		
+}
+ 
+  function delzb()
+  {
+	   var s = '';
+			var rows = $('#tt2').datagrid('getRows');
+			for(var i=0; i<rows.length; i++){
+				s += rows[i].leaderName + ',';
+                                rows[i].bdsl='0';
+                                 $('#tt2').datagrid('updateRow',{ 
+                                                            index: i,
+                                                            row: rows[i]
+                                                         });
+				$('#tt2').datagrid('uncheckRow', i);//不选中
+                                $('#tt2').datagrid('endEdit', i);//停止编辑
+			}
+	  
+	  }
+
+</script>
+
+<!--内容部分start-->
+
+<div class="pageTopBox">
+ <div id="dataGridActionBox"  style="padding:3px" > 
+ <a  id="searchButton" class='but-small but-green'><i class="fa fa-plus"></i>绑定</a>
+  </div>
+  <!--查询-->
+  <div class="searchBox">
+    <form id="searchForm">
+    <input id="userId" name="userId" value="" type="hidden"/>
+      <table border="0" cellspacing="0" cellpadding="3">
+        <tr>
+          <td><ul>
+               <li> <i>部门:</i>
+               <input  type="text" name="orgCode" id="orgCode"  style="width:160px" class="fm_popOutSelect" data-option="{'url':'pages/treeSelector_NoCascade.html','width':520,'height':400,'mulit':false,'locksize':true}"/>
+              </li>
+               <li> <i>人员/车辆:</i>
+               <select name="type" id="type">
+               <option value="1">车</option>
+               <option value="2">人</option>
+               </select>
+              </li>
+            </ul>
+            <div class="cl"></div></td>
+        </tr>
+      </table>
+    </form>
+  </div>
+</div>
+
+<!--表格-->
+<div class="datalist">
+<table width="100%" id="table1">
+<tr>
+<td width="30%">
+ <div class="wraper1"> <div id="tt"> </div> </div>
+</td>
+<td  width="70%">
+ <div class="wraper2"> <div id="tt2"> </div> </div>
+  </td>
+  </tr>
+  </table>
+</div>
+
+<!--内容部分end--> 
+

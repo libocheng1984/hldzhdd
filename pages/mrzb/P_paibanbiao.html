@@ -1,0 +1,172 @@
+<script type="text/javascript">
+function ACTION(){
+	var p=this;	
+	var PAIBAN;
+	var LINSHI;
+	var SubmitForm;
+	var detailAccBox;
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		p.find(".detailBox,.zediewindow").height(p.WRAPER.height()-p.find(".submitButs").outerHeight(true))
+	}		
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){  
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);	
+		//返回按钮事件
+		p.find("#cancelButton").bind("click",function(){ 
+			WINDOW.close(p.WINID);//关闭窗口
+		});
+		
+		//表单例子------------------------------------------
+		PAIBAN=new paibanAction(p.find(".fm_dateQunSelector"));	
+		LINSHI=new paibanActionPoint(p.find(".fm_datePointSelector"));
+		$(PAIBAN).bind("PART_SELECTED",function(e,Vars){
+			LINSHI.updateAllDate(Vars);
+			//更新规则
+			var nval=JSON.stringify(Vars);
+			nval=nval.replace(/\"/g,"\'");
+			p.find("input[name=PAIBANGUIZHE]").val(nval);			
+		})	
+		$(LINSHI).bind("DATE_UPDATE",function(e,Vars){
+			var newVal=JSON.stringify(Vars["dates"]);
+			newVal=newVal.replace(/\"/g,"\'");
+			p.find("input[name=LINSHIPAIBAN]").val(newVal);				
+		})
+		
+		//表单格式化处理
+		SubmitForm=new  formDeal(p.find("#Detail"));// detailDeal(p.find("#Detail"));
+		if(p.CONDITION["zbqsrq"]){
+			$(SubmitForm).one("HTML_FORMATED",getFormData);//绑定格式化完成事件，执行下一步
+		}
+		SubmitForm.parse();	
+		p.find("#saveButton").bind("click",SaveForm);	
+		
+		p.find("[name=KAISHISHIJIAN],[name=JIESHUSHIJIAN]").bind("change",checkTimePart)
+		
+		//创建折叠对象
+		detailAccBox=new AccordionFrame(p.find(".zediewindow"));	
+		
+		p.find("a#clearAllmission").bind("click",LINSHI.clearAll);		
+		//更新一下尺寸
+		p.resize();	
+	}	
+	
+	function checkTimePart(){  
+		var startime=p.find("[name=KAISHISHIJIAN]").val();
+		var endtime=p.find("[name=JIESHUSHIJIAN]").val();  
+		if(startime && endtime){
+			startime=startime.split(":");
+			endtime=endtime.split(":");
+			var today=new Date();			
+			startime=new Date(today.getFullYear(),today.getMonth(),today.getDate(),parseInt(startime[0]),parseInt(startime[1]));
+			endtime=new Date(today.getFullYear(),today.getMonth(),today.getDate(),parseInt(endtime[0]),parseInt(endtime[1]));			
+			if(endtime<=startime){
+				endtime.setDate(endtime.getDate()+1);
+			}
+			var timeDiff=Math.round(100*(endtime.getTime()-startime.getTime())/(60*60*1000))/100;   
+			p.find("#timePart").text(timeDiff);
+		}		
+	}
+
+	
+	//获取数据
+	function getFormData(){
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){			
+			SubmitForm.bindData(backJson["value"]);//绑定数据	
+			
+			//排班规则
+			var paibanObj=p.find("input[name=PAIBANGUIZHE]");    
+			var paibanVal=paibanObj.val().replace(/\'/g,"\"");
+			paibanVal=paibanVal?JSON.parse(paibanVal):{};
+			PAIBAN.setDefultValue(paibanVal);	
+			
+			//临时排班
+			var LinshiPaibanObj=p.find("[name=LINSHIPAIBAN]");    
+			var LinshiPaibanVal=LinshiPaibanObj.val().replace(/\'/g,"\"");
+			LinshiPaibanVal=LinshiPaibanVal?JSON.parse(LinshiPaibanVal):[];   
+			LINSHI.setDefultValue(LinshiPaibanVal);								
+		})
+		Loader.POSTDATA("php/mrzb/getZbzAndMaxZbsj.php",{"event":"GET_PAIBAN","content":{"condition":p.CONDITION},"extend":{}});				
+	}
+	
+	//提交保存
+	function SaveForm(){ 
+		if($(this).hasClass("disabled")){
+			return;	
+		}		
+		if(SubmitForm.check()){ //数据校验
+			//保存失败
+			var errorBack=function(e){				
+				p.find("#saveButton").removeClass("disabled");//解按钮
+			}	
+			//保存成功
+			var saveResult=function(e,BackJson){
+				$.message("保存成功！",2000);
+                                WINDOW.run(p.CONDITION["parentId"],'refresh');
+				p.close();//关闭窗口
+			}
+			//获取表单数据
+			formData=SubmitForm.getData();
+			p.find("#saveButton").addClass("disabled");//锁按钮			
+			var postData={"event":"SAVE_PAIBAN",
+									"extend":{"eventswitch":"save"},
+									"content":{"condition":p.CONDITION,"value":formData}
+									};		
+			var Loader=new AJAXObj();
+			$(Loader).unbind().one("JSON_LOADED",saveResult).one("SYS_ERROR",errorBack);			
+			Loader.POSTDATA("php/mrzb/AddOrUpdateZbsj.php",postData);
+		}
+	}	
+}
+</script>
+<!--内容部分start-->
+<!--表单-->
+<div class="detailBox">
+<form id="Detail">
+  <div class="zediewindow">
+    <div  data-option="{'title':'工作时间','open':true}" id="part_1">
+        <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+          <tr>
+            <th width="80" align="right"><i>开始时间</i></th>
+            <td><input style="width:200px"  class="fm_dateinput"  value="8:00"  data-option="{'data':'h,t','force2':true}"  name="KAISHISHIJIAN" type="text" /></td>
+          </tr>
+          <tr>
+            <th align="right"><i>结束时间</i></th>
+            <td><input style="width:200px"  class="fm_dateinput"  value="8:00"  data-option="{'data':'h,t','force2':true}"  name="JIESHUSHIJIAN" type="text" /></td>
+          </tr>
+          <tr>
+            <th align="right"><i>工作时长</i></th>
+            <td><strong id="timePart" class="red">24</strong> 小时</td>
+          </tr>
+        </table>  
+    </div>
+    
+    <div data-option="{'title':'轮班规则','open':true}"  id="part_2">
+    <input  name="PAIBANGUIZHE" type="hidden" class="fm_paibanInput" value="" />
+  	<div class="fm_dateQunSelector disSelected" data-option="{'afterMonth':2,'beforeMonth':2}">
+    
+  	</div>
+  <p class="tips"><i class="fa fa-question-circle"/> 请分别点击开始和结束时间，设定一个完整的工作--休息周期</p>
+    </div>
+    
+    <div data-option="{'title':'临时排班','open':true}"  id="part_3">
+    <input name="LINSHIPAIBAN" type="hidden" class="fm_paibanInput" value="" />
+    <div class="fm_datePointSelector disSelected" data-option="{'afterMonth':2,'beforeMonth':1,'editable':true}">
+    
+  	</div>
+    <p class="tips"><i class="fa fa-question-circle"/> 请点击今天以后的日期，设定除了正常轮班之外的特殊工作安排。<a id="clearAllmission">清除全部</a></p>
+    </div>
+     
+  </div>
+  </form>
+</div>
+<!--提交按钮-->
+<div class="submitButs"><a  id="saveButton" class="but-normal but-red"><i class="fa fa-save"></i> 保存</a> <a  id="cancelButton" class="but-normal but-yellow"> <i class="fa fa-reply"></i> 取消</a></div>
+<!--内容部分end--> 

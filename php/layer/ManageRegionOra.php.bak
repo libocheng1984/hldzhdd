@@ -1,0 +1,105 @@
+<?php
+	header('Content-Type: text/html; charset=UTF-8');
+	header("Cache-Control: no-cache" );
+	header("Pragma content: no-cache");
+?>
+<?php
+	include_once('../GlobalConfig.class.php');
+	include_once('../class/TpmsDB.class.php');
+	include_once('../class/ManageRegion.class.php');
+	
+	//接收参数
+	$content = isset ($_REQUEST['content']) ? $_REQUEST['content'] : "";
+	$content = Json_decode($content,true);
+	$method="";$name="";$deptid="";$deptname="";$wkt="";$type="";$id="";$code="";
+	if(isset($content['condition'])){
+		$method = isset($content['condition']['method'])?$content['condition']['method']:"";
+		$name = isset($content['condition']['name'])?$content['condition']['name']:"";
+    //            $name=iconv("UTF-8","GBK",$name);
+		$code = isset($content['condition']['code'])?$content['condition']['code']:"";
+		$deptid = isset($content['condition']['deptid'])?$content['condition']['deptid']:"";
+		$deptname = isset($content['condition']['deptname'])?$content['condition']['deptname']:"";
+     //           $deptname=iconv("UTF-8","GBK",$deptname);
+		$wkt = isset($content['condition']['wkt'])?$content['condition']['wkt']:"";
+		$type = isset($content['condition']['type'])?$content['condition']['type']:"";
+		$id = isset($content['condition']['id'])?$content['condition']['id']:"";
+	}
+        
+	if ($method=="") {
+		$arr = array (
+				'head' => array (
+					'code' => 0,
+					'message' => '缺少参数!!'
+				),
+				'value' => '',
+				'extend' => ''
+			);
+		die(json_encode($arr, JSON_UNESCAPED_UNICODE));
+	}
+        $mr = new ManageRegion();
+	//查询
+	if ($method=='select') {
+		$res = $mr->selectManageRegion();
+		echo json_encode($res, JSON_UNESCAPED_UNICODE);
+		
+	}
+
+	//新增
+	if ($method=='insert') {
+		if ($name==""||$deptid==""||$deptname==""||$type==""||$wkt==""||$code=="") {
+			$arr = array (
+					'head' => array (
+						'code' => 0,
+						'message' => '缺少参数!!'
+					),
+					'value' => '',
+					'extend' => ''
+				);
+			die(json_encode($arr, JSON_UNESCAPED_UNICODE));
+		}
+		$res = $mr->insertManageRegion($name, $code, $type, $deptid, $deptname, $wkt);
+		//print_r($res);
+		echo json_encode($res, JSON_UNESCAPED_UNICODE);
+	}
+
+	//修改
+	if ($method=='update') {
+		if ($id=="") {
+			$arr = array (
+					'head' => array (
+						'code' => 0,
+						'message' => '缺少参数!!'
+					),
+					'value' => '',
+					'extend' => ''
+				);
+			die(json_encode($arr, JSON_UNESCAPED_UNICODE));
+		}
+		$res = $mr->updateManageRegion($name, $code, $type, $deptid, $deptname, $wkt);
+		echo json_encode($res, JSON_UNESCAPED_UNICODE);
+	}
+
+	//删除
+	if ($method=='delete') {
+		if ($id=="") {
+			$arr = array (
+					'head' => array (
+						'code' => 0,
+						'message' => '缺少参数!!'
+					),
+					'value' => '',
+					'extend' => ''
+				);
+			die(json_encode($arr, JSON_UNESCAPED_UNICODE));
+		}
+
+		$res = $mr->deleteManageRegion($id);
+		echo json_encode($res, JSON_UNESCAPED_UNICODE);
+	}
+	
+	
+?>
+
+
+
+

@@ -1,0 +1,74 @@
+@charset "utf-8";
+td.workSelected {
+	background-color: #EEFEC5;
+}
+td.workUnSelected {
+
+}
+td.workSelected .workIcon ,td.workUnSelected .workIcon  ,td.UserSelected .workIcon{
+	font-size: 12px;
+	line-height: 20px;
+	margin: 0px;
+	padding: 0px;
+	height: 20px;
+	width: 20px;
+	position: absolute;
+	top: 3px;
+	border-radius: 40px;
+	text-align: center;
+	text-shadow: none;
+	left: 62%;
+}
+td.workSelected .workIcon.onwork{
+	background-color: #F00;
+	color: #FFF;
+}
+td.workSelected .workIcon.offwork{
+	background-color: #09F;
+	color: #FFF;
+}
+td.workUnSelected .workIcon.onwork{
+	color: #F60;
+}
+td.workUnSelected .workIcon.offwork{
+	color: #BBB;
+}
+
+td.UserSelected .normalworkIcon {
+	display:none;
+}
+
+td.UserSelected .workIcon.onwork{
+	background-color: #F00;
+	color: #FFF;
+}
+td.UserSelected .workIcon.offwork{
+	background-color: #09F;
+	color: #FFF;
+}
+
+.StatusSelector{
+	background-color: #FFF;
+	margin: 0px;
+	position: absolute;
+	left: 0px;
+	top: -30px;
+	right: 0px;
+	bottom: 0px;
+	text-align: justify;
+	z-index: 99;
+}
+.StatusSelector a{
+	background-color: #333333;
+	display: block;
+	height: 22px;
+	line-height: 22px;
+	text-align: center;
+	box-sizing: border-box;
+	color: #FFFFFF;
+	margin-right: auto;
+	margin-left: auto;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	border-bottom-color: #565656;
+}

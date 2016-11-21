@@ -1,0 +1,160 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION.READY方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){  
+		p.find(".treeWraper").height(p.WRAPER.height()-165);	//p.find(".pageTopBox").outerHeight(true)-p.find(".searchBox").outerHeight(true)
+	}
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){  
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+		
+		//表单处理
+		SearchForm=new formDeal(p.find("#searchForm"));//创建表单
+		SearchForm.parse();//格式化表单	
+		//绑定查询按钮点击
+		p.find("#searchButton").bind("click",StartSearch);
+		p.find("#cancelButton").bind("click",function(){
+			WINDOW.close(p.WINID);	
+		});			
+		
+//		//更新一下尺寸
+		p.resize();		
+		
+		//安装树EasyUI
+		var treeoption={
+			"url":"host/tree_data_check_yibu.asp",
+			"animate":true,
+			"checkbox":true,
+			"onlyLeafCheck":false, //只选叶子
+		  	"cascadeCheck":true, //级联检查
+		  	"exceptNobranch":true,//在结果中去除树枝
+		 	 "method":"post",
+		 	 "onBeforeLoad":function(node,param){ //加载分支前附加参数
+			 	 if(node){
+			 	 	param?param["value"]=node["value"]:{"value":node["value"]}
+			 	 }
+			  },
+		 	"loadFilter":myLoadFilter
+		  }
+		p.find("#bumentree").tree(treeoption);
+	}
+	
+	
+	//查询
+	function StartSearch(){
+		if(SearchForm.check()){ //数据校验
+			var searchCondition=SearchForm.getData();//获取表单条件
+			//获取树选中
+			//....
+			//刷新地图点信息	
+			//....		
+		}
+	}	
+	
+	
+	//异步树过滤器
+	function myLoadFilter(data, parent){
+		data=formatHostJson(data);//全局过滤
+		
+		var state = $.data(this, 'tree');
+		
+		function setData(){
+			var serno = 1;
+			var todo = [];
+			for(var i=0; i<data.length; i++){
+				todo.push(data[i]);
+			}
+			while(todo.length){
+				var node = todo.shift();
+				if (node.id == undefined){
+					node.id = '_node_' + (serno++);
+				}
+				if (node.children){
+					node.state = 'closed';
+					node.children1 = node.children;
+					node.children = undefined;
+					todo = todo.concat(node.children1);
+				}
+			}
+			state.tdata = data;
+		}
+		
+		function find(id){
+			var data = state.tdata; 
+			var cc = [data];
+			while(cc.length){
+				var c = cc.shift();
+				for(var i=0; i<c.length; i++){
+					var node = c[i]; 
+					if (node.id == id){
+						return node;
+					} else if (node.children1){
+						cc.push(node.children1);
+					}
+				}
+			}
+			return null;
+		}
+		
+		setData();
+		
+		var t = $(this);
+		var opts = t.tree('options');
+		opts.onBeforeExpand = function(node){
+			var n = find(node.id);
+			if (n.children && n.children.length){return}
+			if (n.children1){
+				var filter = opts.loadFilter;
+				opts.loadFilter = function(data){return data;};
+				t.tree('append',{
+					parent:node.target,
+					data:n.children1
+				});
+				opts.loadFilter = filter;
+				n.children = n.children1;
+			}
+		};
+		return data;
+	}
+}
+</script>
+
+<!--内容部分start-->
+<style type="text/css">
+.whitebk {
+	background-color: #FFF;
+}
+.treeWraper {
+	overflow: auto;
+}
+</style>
+
+<div class="pageTopBox">
+  <h1 class="pagetitle">任务点分布查询</h1>
+</div>
+<h1 class="pageSubtitle">时间段</h1>
+<div class="searchBox whitebk">
+  <form id="searchForm">
+    <input style="width:100%"  class="fm_datepartinput"  value=""  data-option="{'data':'h,t','force2':true,'fast':false}"  name="starttime" type="text"/>
+  </form>
+</div>
+<h1 class="pageSubtitle">部门选择</h1>
+<div class="treeWraper whitebk">
+  <div id="bumentree"></div>
+</div>
+
+<!--提交按钮-->
+<div class="submitButs"><a  id="searchButton" class="but-normal but-red"><i class="fa fa-search"></i> 查询</a> <a  id="cancelButton" class="but-normal but-yellow"> <i class="fa fa-reply"></i> 关闭</a></div>
+<!--内容部分end--> 
+

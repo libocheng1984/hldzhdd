@@ -1,0 +1,118 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		p.find(".formBox").height(p.WRAPER.height()-p.find(".submitButs").outerHeight(true));
+	}
+	
+	//表单对象
+	var SubmitForm;
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	
+	}
+	
+	this.READY=function(){
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+		
+		
+		
+		//表单例子------------------------------------------	
+		
+			
+		//表单格式化处理
+		SubmitForm=new formDeal(p.find("#Form"));
+		$(SubmitForm).one("HTML_FORMATED",getFormData);//绑定格式化完成事件，执行下一步
+		SubmitForm.parse();			
+		p.find("#refPwd").bind("click",refpassowrd);
+		//console.log(p.CONDITION);
+		//更新一下尺寸
+		p.resize();	
+		
+	}
+	
+	//编辑状态，获取数据
+	function getFormData(){ 
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){			
+			SubmitForm.bindData(backJson["value"]);//绑定数据		
+//			alert(1)
+//			SubmitForm.bindData(backJson["value"]);//测试重复绑定数据		
+			
+			p.find("#saveButton").bind("click",SaveForm);	
+			p.find("#resetButton").bind("click",SubmitForm.clear);		
+		})
+		Loader.POSTDATA("php/user/getUserInfo.php",{"event":"FormEdit","content":{"condition":p.CONDITION},"extend":{}});				
+		p.find("#cancelButton").bind("click",function(){ 
+			WINDOW.	close(p.WINID);//关闭窗口
+		});
+	}
+
+	//提交保存
+	function SaveForm(){
+		if(SubmitForm.check()){ //数据校验
+			//保存失败
+			var errorBack=function(e){				
+				p.find("#saveButton").removeClass("disable");//解按钮
+			}	
+			//保存成功
+			var saveResult=function(e,BackJson){
+				$.message("保存成功！",2000);
+				var parentWindow=WINDOW.getActionById(p.CONDITION["parentid"]);//通过窗体ID找到窗体对象（ACTION）
+				parentWindow.refesh(); //执行父窗体方法
+				WINDOW.	close(p.WINID);//关闭窗口
+			}
+			//获取表单数据
+			formData=SubmitForm.getData();
+			p.find("#saveButton").addClass("disable");//锁按钮			
+			var postData={"event":"saveForm",
+									"extend":{"eventswitch":"save"},
+									"content":{"condition":formData}
+									};
+			postData.content.condition.id=p.CONDITION["id"];	
+			var Loader=new AJAXObj();
+			$(Loader).unbind().one("JSON_LOADED",saveResult).one("SYS_ERROR",errorBack);			
+			Loader.POSTDATA("php/user/updateUserOrg.php",postData);
+		}
+	}
+}
+</script>
+<!--内容部分start-->
+<!--表单-->
+
+<div class="formBox">
+  <form id="Form">
+    <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab">
+      <tr>
+        <th align="right"><i>所属部门</i></th>
+        <td><input name="parentOrgCode"  type="text"  style="width:200px" class="fm_popOutSelect" data-option="{'url':'pages/treeSelector_NoCascade.html','width':520,'height':400,'mulit':false,'locksize':true}" /></td>
+      </tr>
+     
+      <tr>
+        <th align="right"><i>警员账号</i></th>
+        <td><span id="userid"/></td>
+      </tr>
+      <tr>
+        <th align="right"><i>警员姓名</i></th>
+        <td><span id="username"/></td>
+      </tr>
+      
+      
+    </table>
+  </form>
+</div>
+<!--提交按钮-->
+<div class="submitButs"><a  id="saveButton" class="but-normal but-red"><i class="fa fa-save"></i> 保存</a> 
+
+<a  id="cancelButton" class="but-normal but-yellow"> <i class="fa fa-reply"></i> 关闭</a>
+
+</div>
+<!--内容部分end-->

@@ -1,0 +1,211 @@
+.SqlWraper {
+	background-color: #FFFFFF;
+	margin: 0px;
+	padding: 8px;
+}
+.SqlWraper .blockBox {
+	margin: 0px;
+	padding: 5px;
+}
+.SqlWraper .blockBox a {
+	text-decoration: none;
+	font-weight: normal;
+}
+.SqlWraper .blockBox.opreatorBox{
+	border-bottom-width: 1px;
+	border-bottom-style: dotted;
+	border-bottom-color: #DBDBDB;
+}
+.SqlWraper .blockBox.opreatorBox a{
+	white-space: nowrap;
+	display: inline-block;
+	background-color: #FC0;
+	color: #FFF;
+	font-size: 16px;
+	line-height: 22px;
+	font-weight: normal;
+	margin: 3px;
+	text-align: center;
+	border-radius: 6px;
+	padding-top: 4px;
+	padding-right: 12px;
+	padding-bottom: 4px;
+	padding-left: 12px;
+}
+.SqlWraper .blockBox.opreatorBox span {
+	display: none;
+}
+.SqlWraper .blockBox.opreatorBox span.display {
+	display: inline-block;
+	width: 18px;
+}
+
+.SqlWraper .blockBox.conditionBox a{
+	display: block;
+	padding-right: 12px;
+	padding-left: 12px;
+	font-size: 14px;
+	line-height: 24px;
+	background-color: #CF6;
+	margin: 3px;
+	cursor: default;
+	padding-top: 2px;
+	padding-bottom: 2px;
+	border-radius: 3px;
+	text-align: center;
+}
+.SqlWraper .blockBox.conditionBox a strong{
+	font-weight: normal;
+}
+.SqlWraper .blockBox.conditionBox a i {
+	font-weight: bold;
+	display: inline-block;
+	color: #F00;
+	margin: 0px;
+	padding-right: 6px;
+	padding-left: 6px;
+	font-style: normal;
+}
+
+.SqlWraper .blockBox.conditionBox span {
+	display: none;
+}
+.SqlWraper .SqlContainer {
+	height: 130px;
+	overflow: hidden;
+	background-color: #FFF;
+}
+.SqlWraper .SqlContainer p.tishi{
+	font-size: 12px;
+	line-height: 22px;
+	color: #F60;
+	background-color: #FF9;
+	padding: 3px;
+	margin-top: 2px;
+	margin-right: 40px;
+	margin-bottom: 2px;
+	margin-left: 40px;
+	text-align: center;
+	border-radius: 8px;
+}
+.SqlWraper .sqlBox {
+	text-align: center;
+	white-space: nowrap;
+	margin: 0px;
+	padding: 5px;
+}
+
+.SqlWraper .sqlBox a strong{
+	background-color: #FFFFFF;
+	vertical-align: middle;
+	display: inline-block;
+	white-space: nowrap;
+	height: 32px;
+	padding-right: 8px;
+	padding-left: 8px;
+	color: #666;
+	margin: 0px;
+	font-weight: normal;
+	font-size: 16px;
+}
+.SqlWraper .sqlBox a span.candrop{
+	background-color: #FF0;	
+}
+.SqlWraper .sqlBox a.candrop strong{
+	background-color: #FF6;
+	color: #F00;
+}
+
+.SqlWraper .sqlBox a span{
+	display: inline-block;
+	white-space: nowrap;
+	background-color: #F4F4F4;
+	padding-top: 0px;
+	padding-right: 12px;
+	padding-bottom: 0px;
+	padding-left: 0px;
+	vertical-align: middle;
+	min-width: 64px;
+	text-align: center;
+	height: 32px;
+	margin: 0px;
+	border-radius:4px;
+}
+.SqlWraper .sqlBox a i {
+	font-weight: normal;
+	display: inline-block;
+	color: #090;
+	margin: 0px;
+	padding-right: 6px;
+	padding-left: 6px;
+	font-style: normal;
+	font-size: 16px;
+	vertical-align: middle;
+	line-height: 26px;
+	height: 32px;
+}
+.SqlWraper .sqlBox a {
+	display: inline-block;
+	cursor: default;
+	font-size: 16px;
+	line-height: 26px;
+	text-align: center;
+	text-decoration: none;
+	font-family: "微软雅黑";
+	padding: 0px;
+	white-space: nowrap;
+	vertical-align: middle;
+	margin: 0px;
+}
+
+.SqlWraper .sqlBox a.conditionPart strong{
+	color: #F60;
+	font-size: 20px;
+}
+.SqlWraper .ConditionContainer {
+	background-color: #F6F6F6;
+}
+.SqlWraper .conditionCreatBox {
+	background-color: #E2E2E2;
+}
+
+.SqlWraper .conditionItem {
+	margin: 2px;
+	padding: 3px;
+}
+.SqlWraper .conditionItem span.label {
+	display: inline-block;
+	text-align: right;
+	padding-right: 6px;
+	min-width:120px;
+}
+.SqlWraper .conditionItem a {
+	background-color: #09C;
+	color: #FFF;
+	display: inline-block;
+	padding-right: 5px;
+	padding-left: 5px;
+	line-height: 22px;
+	margin-top: 1px;
+	border-radius:3px;
+}
+.SqlWraper .conditionItem a:hover {
+	background-color: #00ACE6;	
+}
+.SqlWraper .sqlShowBox {
+	font-size: 16px;
+	color: #666;
+	line-height: 26px;
+	text-align: center;
+	white-space: nowrap;
+	margin: 0px;
+	height: 26px;
+	padding-top: 0px;
+	padding-right: 5px;
+	padding-bottom: 5px;
+	padding-left: 5px;
+}
+.SqlWraper .conditionBox a.conditionPart {
+	float: left;
+	text-align: left;
+}

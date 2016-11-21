@@ -1,0 +1,59 @@
+<?php
+
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+/**
+ * Description of CodeByGeometry
+ *
+ * @author Administrator
+ */
+class CodeByGeometry extends TpmsDB {
+    public function getOrgGeometry($x,$y,$type){
+		if ($this->dbconn == null)
+			$this->dbconn = $this->LogonDB();
+		
+		$sql = "select ";
+                if($type=="pcs")
+                {
+                    $sql.="orgcode , orgname from zdb_organization where orglevel='32' and sdo_geom.relate(rect,'Anyinteract',sdo_geometry(2001,4326,sdo_point_type($x,$y,null),null,null),0.5)='TRUE'";
+                }
+                if($type=='zrq')
+                {
+                    $sql.="orgcode , orgname from zdb_organization where orglevel='50' and sdo_geom.relate(rect,'Anyinteract',sdo_geometry(2001,4326,sdo_point_type($x,$y,null),null,null),0.5)='TRUE'";
+                }
+                if($type=='xlq')
+                {
+                    $sql.=" code orgcode ,name orgname  from tb_manage_region where sdo_geom.relate(geo,'Anyinteract',sdo_geometry(2001,4326,sdo_point_type($x,$y,null),null,null),0.5)='TRUE'";
+                }
+    //echo $sql;            
+		$stmt = oci_parse($this->dbconn, $sql);
+		if (!@oci_execute($stmt)) {
+			echo getOciError($stmt);
+			oci_close($this->dbconn);
+			exit; 
+		}else{
+			if (($row = oci_fetch_assoc($stmt)) != false) {
+				$arr = array(
+					'orgcode' => iconv("GBK","UTF-8",$row["ORGCODE"]),
+					'orgname' => iconv("GBK","UTF-8",$row["ORGNAME"])
+				);
+				
+			}
+                        else
+                        {
+                            $arr = array(
+					'orgcode' => iconv("GBK","UTF-8",$row["ORGCODE"]),
+					'orgname' => iconv("GBK","UTF-8",$row["ORGNAME"])
+				);
+                        }
+		}
+		oci_free_statement($stmt);
+		oci_close($this->dbconn);
+		return $arr;
+	}
+}
+?>

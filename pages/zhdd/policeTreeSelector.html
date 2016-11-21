@@ -1,0 +1,164 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	var Tree;
+	var SELECTOR;
+	var onCheckFlag= false;
+	var record = null;
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		var H=p.WRAPER.height()-p.find(".submitButs").outerHeight(true); 
+		SELECTOR.resize(p.WRAPER.width(),H);
+	}	
+	
+	this.DESTROY=function(){ 
+		if(SELECTOR){
+			SELECTOR.destroy();// 销毁对象
+			SELECTOR=null;	
+		}
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){
+		var option={
+			'title':"查询",
+			"url":"php/communication/GetSearchAllContacts_web.php", //查询接口
+			"param":null, //查询附加条件，可无
+			"searchClass":[{"name":"查警员","value":"1"},{"name":"查部门","value":"2"},{"name":"查巡逻组","value":"3"}], //查询过滤，下拉选择配置			
+			"checkEq":["userId"], //判断是否重复的字段名，全等为重复,null为不校验重复
+			"checkField":{"name":"userName","value":["userId","userName"]}, //name用于显示的字段名，value 选中后需要返回的字段名	提交接口时参数对应		
+			"groupSet":{"groupBy":"orgCode","groupTitle":"orgName", "searchGroupBy":"groupCode","searchGroupTitle":"groupName"}, //选中的group分组字段名，组名字段名//查询的group分组字段名，组名字段名（可创造一个）。
+			//"checkField":{"name":"userName","value":"userId","searchGroupBy":"groupCode","searchGroupTitle":"groupName","groupBy":"orgCode","groupTitle":"orgName"},   //名，值与字段名对照关系,group分组字段名，组名字段名。			
+			"mulit":false,  //true多选
+			"selectBoxWidth":240, //备选框宽度
+			"listFormator":function(rowData){   //自定义显示格式化，方法,不写默认用name
+				return '<span>'+rowData["userName"]+'</span>'
+			},
+			//树参数,不配置表示没有树形选择
+			"treeOptions":{
+				'title':"组织结构",
+				"url":"php/communication/GetContacts_web.php", //树形数据接口
+				"queryParams":{"event":"FormEdit","content":{"condition":{"orgCode":userData.orgCode}},"extend":{}}, //查询附加条件，如果有
+				"onlyLeafCheck":true, //只选叶子
+				"cascadeCheck":true, //级联检查
+				"exceptNobranch":true,//在结果中去除树枝
+				"method":"post",
+				"onBeforeLoad":function(node,param){ //加载分支前附加参数
+					if(node){
+						param.content.condition.orgCode=node.id;
+						param.content.condition.id=node.id;
+						//alert(JSON.stringify(param));
+					}
+				},
+				"loadFilter":myLoadFilter	 //异步树
+			}
+		};
+
+		
+		//生成选择对象
+		SELECTOR=new ComSelctor(p.find(".selectWraper"),option);
+		//初始值，从上级页面获取
+		/*
+		SELECTOR.setDefault([
+			  {"name":"张老三A","value":"21381237","orgName":"大连市公安局","orgId":"001"},
+			  {"name":"李老四B","value":"2333f333","orgName":"大连市公安局","orgId":"001"},
+			  {"name":"张老三C","value":"21381g5237","orgName":"大连市公安局","orgId":"001"},
+			  {"name":"李老四B","value":"2333f333","orgName":"大连市公安局","orgId":"001"},
+			  {"name":"李老四D","value":"42333333","orgName":"西岗分局","orgId":"002"},
+			  {"name":"张老三E","value":"212381h237","orgName":"中山分局","orgId":"004"},
+			  {"name":"李老四Z","value":"2y33337334ere3"}
+		]);
+		*/
+		
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+		//更新一下尺寸
+		p.resize();
+		
+		//绑定确定按钮
+		p.find("#confirmButton").bind("click",function(){	
+			//获得选中的数据
+			var values="";var texts="";
+			var selected=SELECTOR.getSelected(); //数组
+			//console.log(JSON.stringify(selected));
+			//格式化成上一页需要的格式
+			for(var i=0;i<selected.length;i++){
+				if(i==0){
+					values = selected[i]["userId"];
+					texts = selected[i]["userName"];
+				}else{
+					values += ","+selected[i]["userId"];
+					texts += ","+selected[i]["userName"];
+				}
+			}
+			var result = {"text":texts,"value":values};
+			//console.log(JSON.stringify(result));
+			//返回赋值
+			WINDOW.callback(p.WINID,result);					
+			WINDOW.	close(p.WINID);//关闭窗口
+			
+		})
+		//绑定取消按钮
+		p.find("#cancelButton").bind("click",function(){ 
+			WINDOW.	close(p.WINID);//关闭窗口
+		})
+	}	
+	
+	//异步树过滤器
+	function myLoadFilter(data, parent){
+			data=formatHostJson(data);//全局过滤			
+			var state = $.data(this, 'tree');
+			
+		    function setData(){
+		    	var serno = 1;
+		        var todo = [];
+		        for(var i=0; i<data.length; i++){
+		            todo.push(data[i]);
+		        }
+		        while(todo.length){
+		            var node = todo.shift();
+		            if (node.id == undefined){
+		            	node.id = '_node_' + (serno++);
+		            }
+		            if (node.children){
+		                node.state = 'closed';
+		                node.children1 = node.children;
+		                node.children = undefined;
+		                todo = todo.concat(node.children1);
+		            }
+		        }
+		        state.tdata = data;
+		    }
+   
+		    setData();		    
+		    var t = $(this);
+		    var opts = t.tree('options');
+		    opts.onBeforeExpand = function(node){
+	    		var n = node;// find(node.id);
+	    		if (n.children && n.children.length){return}
+		    	if (n.children1){
+		    		var filter = opts.loadFilter;
+		    		opts.loadFilter = function(data){return data;};
+		    		t.tree('append',{
+		    			parent:node.target,
+		    			data:n.children1
+		    		});
+		    		opts.loadFilter = filter;
+		    		n.children = n.children1;
+		    	}
+		    };
+			return data;
+		}
+}
+</script>
+<!--内容部分start-->
+<!--选择容器-->
+<div class="selectWraper"></div>
+
+<!--提交按钮-->
+<div class="submitButs"> <a  id="confirmButton"  class="but-normal but-red"> <i class="fa fa-save"></i> 确定</a> <a  id="cancelButton" class="but-normal but-greenlight"> <i class="fa fa-reply"></i> 取消</a> </div>
+<!--内容部分end--> 

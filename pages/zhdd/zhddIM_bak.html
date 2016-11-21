@@ -1,0 +1,652 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	var TABBox;
+	//tab页的typeid
+	var TABBoxFlag="1";
+	var Tree;
+	var SearchForm;
+	var SearchFormGroup;
+	var BoxClassName="selectTreeBox";
+	var onCheckFlag= false;
+	var tempGroupName="";
+	var record;
+	var LIST;
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		if(TABBox){
+			TABBox.resize();
+		}
+	}
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){ 
+                
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+		//表单处理
+		SearchForm=new formDeal(p.find("#searchForm"));
+		SearchForm.parse();
+		SearchForm.bindData(p.CONDITION);//绑定默认条件
+		SearchFormGroup=new formDeal(p.find("#searchFormGroup"));
+		SearchFormGroup.parse();
+		SearchFormGroup.bindData(p.CONDITION);//绑定默认条件
+		if(p.CONDITION!=null)
+		{
+		    record = p.CONDITION["record"];
+		}
+		if(record!=null)
+		{
+		    p.find("#jqbh").val(record.jqbh);
+		}
+		//安装树选择,异步加载树
+		var treeOptions={
+			"url":"php/communication/GetContacts_web.php",
+			"queryParams":{"event":"FormEdit","content":{"condition":{"orgCode":userData.orgCode}},"extend":{}},		  
+			"onlyLeafCheck":false, //只选叶子
+			"cascadeCheck":true, //级联检查
+			"method":"post",
+			"animate":true,
+			"checkbox":true,
+			"onCheck":treeOnSelect,
+			"onLoadSuccess":treeOnLoadSuccess,
+			"onBeforeLoad":function(node,param){ //加载分支前附加参数
+				if(node){
+					param.content.condition.orgCode=node.id;
+					param.content.condition.id=node.id;
+					//alert(JSON.stringify(param));
+				}
+			},
+			"loadFilter":myLoadFilter
+		}
+               
+		p.find(".selectTreeBox").tree(treeOptions);
+		treeOptions.url="php/communication/GetGroups_web.php";
+		p.find(".selectTreeBoxCar").tree(treeOptions);
+		//表格例子------------------------------------------
+		/*
+		var clumoption=[[
+			{field:'qzmc',title:'群组名称',width:120,fixed:true,align:"center",sortable:true},
+			{field:'fssj',title:'发送时间',width:"20%",resizable:false,align:"center"},
+			{field:'xxnr',title:'消息内容',width:"45%"},
+			{field:'xxlx',title:'消息类型',width:180,align:'left'}
+			]];
+                
+		p.find("#tt").datagrid({
+			url:"php/communication/GetMsgGroups_web.php",	
+                        queryParams:{"event":"FormEdit","content":JSON.stringify({"condition":{"userId":userData.userId}}),"extend":{}}, //附加参数对象
+			loadFilter:formatCommonJson,
+			fit:true,
+			showFooter:true,//显示总计??
+			rownumbers:true,//行号
+			//singleSelect:true,
+			fitColumns:true,//宽度自适应
+			striped:true,//条纹
+			columns:clumoption
+		}).datagrid('getPager').pagination({  //设置显示列切换按钮
+				//buttons:$('#buttons');//插入html
+				buttons:[{
+					iconCls:'icon-clumconfig',
+					handler:function(){ClumChocie(p.find('#tt'),$(this))}
+				}]
+		})
+		*/
+               
+		//安装TAB组件	(tab标签容器,对应标签的内容容器)
+		TABBox=new Tabs(p.find(".fm_tabBox"),p.find("#tabcont"));
+		$(TABBox).bind("TAB_CLICK",function(e,Vars){ //绑定tab标签点击事件	
+			var option=Vars["tabItem"].getDataOptions();//获得按钮参数
+			TABBoxFlag=option.type;
+			if(option.type=="1")
+			{
+			    BoxClassName="selectTreeBox";
+			    p.find("#selectWraper").show();
+			    p.find(".listViewTemplete").hide();
+			    p.find("#selectWraperCar").hide();
+			    p.find(".searchBoxGroup").show();
+			    p.find(".createChartGroup").hide();
+			    p.find(".searchBox").show();
+			    p.CONDITION.tabbox=1;
+			   
+			}
+			 if(option.type=="2")
+			{
+			    BoxClassName="selectTreeBoxCar";
+			    p.find("#selectWraperCar").show();
+			    p.find("#selectWraper").hide();
+			    p.find(".listViewTemplete").hide();
+			    p.find(".searchBoxGroup").show();
+			    p.find(".createChartGroup").hide();
+			    p.find(".searchBox").show();
+			    p.CONDITION.tabbox=2;
+			}
+			if(option.type=="3")
+			{
+				p.find("#selectWraper").hide();
+				p.find("#selectWraperCar").hide();
+				p.find(".listViewTemplete").show();
+				//p.find("#tt").datagrid("reload");
+				showGroup();
+			 	p.find(".searchBox").hide();
+			 	p.find(".searchBoxGroup").hide();
+			    p.find(".createChartGroup").show();
+				p.CONDITION.tabbox=3;
+			}
+                        
+			//p.find("#tt").datagrid("reload",option);//更新表格
+		}).bind("TAB_RESIZE",function(e,size){ //绑定tab布局resize事件
+			p.find(".listViewTemplete").height(size.h-30);
+			p.find(".listViewTemplete").width(size.width);
+			p.find(".datalist").height(size.h);	
+			//p.find("#tt").datagrid("resize"); 
+			//p.find("#tt").height(size.h);
+			//p.find("#tt").width(size.width);
+			p.find(".selectWraper").setRealSize(size.width,size.h-70);
+			p.find(".selectTreeBox").setRealSize(size.width,size.h-70);
+			p.find(".selectWraperCar").setRealSize(size.width,size.h-70);
+			p.find(".selectTreeBoxCar").setRealSize(size.width,size.h-70);
+		})
+		
+		//更新一下尺寸，注意执行时间点，一般放在最后
+		p.resize();
+		var tabbox;
+		if(p.CONDITION==null){
+			p.CONDITION={};
+			tabbox =1;
+		} else {
+			tabbox=p.CONDITION.tabbox;
+		}
+                
+		if(tabbox==null||tabbox==1)
+		{
+			tabbox=1;
+			p.find("#selectWraperCar").hide();
+			p.find(".listViewTemplete").hide();
+		}
+                
+		TABBox.gotoTab(tabbox-1);
+
+		p.find("#searchButton").bind("click",SearchButtonClick);
+		p.find("#resetButton").bind("click",ResetButtonClick);
+		p.find("#createGroup").bind("click",createGroupClick);
+		p.find("#createChart").bind("click",createChartClick);
+		p.find("#addPerson").bind("click",addPerson);
+                
+		//列表格式化例子------------------------------------------
+		LIST=new ListView(p.find(".fm_listTemp"),{"enableCheck":true,"mulitCheck":false});
+		/*//绑定点击事件 
+		$(LIST).unbind("LI_CLICKED").bind("LI_CLICKED",function(e,lidata){ 
+			//TODO 点击弹出画面，带上信息中的人
+			LIST.findAndCheck("groupid",lidata["data"]["groupid"],true);
+			alert(lidata["data"]["groupid"]);
+			//WEBCHAT.openGroup(groupid,true);
+		}) */
+		//绑定聊天组删除事件
+		$(WEBCHAT).unbind("DELETE_GROUP").bind("DELETE_GROUP",function(e,groupVar){
+			LIST.findAndRemove("groupid",groupVar["groupid"]);
+		}).unbind("CREAT_GROUP").bind("CREAT_GROUP",function(e,groupJson){
+			var group=LIST.find("groupid",groupJson["groupid"]);
+			if(!group){
+				LIST.insert(groupJson);		
+			}
+		})
+		var ListFormater=function(oneRow){ 
+			oneRow["groupid"]=oneRow["iscreator"]?oneRow["groupid"]:"...";
+			oneRow["groupid"]=oneRow["iscreator"]?'<a rel="'+oneRow["groupid"]+'" class="showJingqing red" title="删除人员组">[ 删除人员组 ]</a> ':oneRow["groupid"];
+			return oneRow;
+		}
+		
+		//格式化独立事件绑定------------------------------------
+		var ActionFormater=function(RowObj){
+			RowObj.find("a.showJingqing").bind("click",function(){
+				var groupid=$(this).attr("rel");
+				//alert("此处打开警情窗口，ID："+jingqing)
+                var postData={
+					"event":"delete",
+					"extend":{},
+					"content":{"condition":{"id":groupid}}
+				};
+				var Loader=new AJAXObj();
+				$(Loader).bind("JSON_LOADED",function(e,backJson){	
+					var rowData = backJson.value;
+					if(rowData){
+						$.message("删除成功!");
+						LIST.reload({"event":"select","content":JSON.stringify({"condition":{"userId":userData.userId}}),"extend":{}});
+					}else{
+						//TODO 提示删除失败
+						$.message("删除失败!");
+					}
+				});
+				Loader.POSTDATA("php/communication/CommonGroup.php",postData);
+				return false;
+			})
+		}
+		//获取数据
+		LIST.load("php/communication/CommonGroup.php",{"event":"select","content":JSON.stringify({"condition":{"userId":userData.userId}}),"extend":{}},ListFormater,ActionFormater);//获取数据
+		//列表格式化例子------------------------------------------
+	}
+	function createGroupClick(){
+		p.find("#createGroup").unbind("click",createGroupClick);
+		var ren = "";
+		var che = "";
+		var nodes = p.find('.selectTreeBox').tree('getChecked');
+		for(var i=0;i<nodes.length;i++){
+			if(p.find(".selectTreeBox").tree('isLeaf',nodes[i].target)) {
+				ren+=nodes[i].id+",";
+		    }
+		}
+		ren+=userData.userId;
+		var nodes =  p.find('.selectTreeBoxCar').tree('getChecked');
+		for(var i=0;i<nodes.length;i++){
+		     if(p.find(".selectTreeBox").tree('isLeaf',nodes[i].target))
+		    {
+		        che+=nodes[i].id+",";
+		    }
+		}
+		if(che.length>0) {
+           che=che.substring(0,che.length-1);
+        }
+        var qzmc =p.find("#groupName").val();
+        var jqbh = p.find("#jqbh").val();
+        var condition={
+			qzmc:qzmc,
+			cjrId:userData.userId,
+			qzcy:ren,
+			jqbh:jqbh,
+			groupname:qzmc,
+			jingqing:jqbh,
+			gids:che
+		};
+                //alert(condition.qzmc);
+                //alert(p.find("#jqbh").val());
+		WEBCHAT.creatGroup(condition);
+		
+		//alert(JSON.stringify(postData));
+		//var Loader=new AJAXObj();
+		//$(Loader).bind("JSON_LOADED",function(e,backJson){
+                      
+               //             $.alert("创建成功");
+                      
+                       
+		//}); 
+		//Loader.POSTDATA("php/communication/CreateGroups_web.php",postData);
+	
+           // p.find("#createGroup").bind("click",createGroupClick);
+		WINDOW.close(p.WINID); 
+	}
+
+	function createChartClick(){
+        //=====================
+        var checked = LIST.getChecked();
+        if(checked.length < 1) {
+        	$.alert("请选择会话组");
+        	return;
+        }
+        var sendGroupid = checked[0]["groupid"];
+        //alert(LIST.getChecked()[0]["data"]["jqbh"]);
+        //var groupid = LIST.getChecked()[0]["data"]["groupid"];
+		//qzmc = "新会话ABCDEFG";
+		qzmc = p.find("#chartName").val();
+		cjrId = userData.userId,
+		//qzcy = "210203194804075014,210203196509116011,210202195107014935,210203199107156030";
+		qzcy = userData.userId,
+		jqbh = p.find("#jqbh").val();
+		groupid = sendGroupid,
+		groupname = p.find("#chartName").val();
+		jingqing = "";
+		gids = "";
+		var condition={
+			qzmc:qzmc,
+			cjrId:cjrId,
+			qzcy:qzcy,
+			jqbh:jqbh,
+			groupid:groupid,
+			groupname:groupname,
+			jingqing:jingqing,
+			gids:gids
+		};
+        //=====================
+		WEBCHAT.creatGroup(condition);
+		WINDOW.close(p.WINID); 
+	}
+
+	//创建会话的按键
+	function addPerson(){
+		//var chartName = p.find("#chartName").val();
+		WINDOW.open({"name":'IMopenChart',"width":480,"height":409,"url":"pages/zhdd/zhddImAddChart.html","title":"群组人员添加",'position':'right_bottom','callback':insertGroup},{"record":{"userId":userData.userId},"winId":p.WINID});
+	}
+	function insertGroup(values) {
+		//alert(values['chartName']);
+		//var chartName = p.find("#chartName").val();
+		var postData={
+			"content":{"condition":{"id":"",
+									"qzmc":values['chartName'],
+									"cjrId":userData.userId,
+									"qzcy":values['value']
+						}},
+			"event":"create"
+		};
+		//console.log(url);
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){
+			if (backJson['head']['code'] == 0) {
+				$.alert(backJson['code']['message']);
+			} else {
+				$.alert("创建成功");
+				LIST.reload({"event":"select","content":JSON.stringify({"condition":{"userId":userData.userId}}),"extend":{}});
+			}
+		});
+		$(Loader).bind("SYS_ERROR",function(e,msg){
+			$.alert("创建失败" + (msg==null || msg=="")? "" : ":"+msg);
+		});
+		Loader.POSTDATA("php/communication/CommonGroup.php",postData);
+	}
+	//部门搜索
+	function SearchButtonClick(){
+		var formData=SearchForm.getData();
+		var flag = true;
+		p.find("#resetButton").unbind("click",ResetButtonClick);
+		p.find("#searchButton").unbind("click",SearchButtonClick);
+                var nodes;
+                
+                if(TABBoxFlag=="1")
+                {
+                    BoxClassName="selectTreeBox";
+                   
+                }
+                else if(TABBoxFlag=="2")
+                {
+                     BoxClassName="selectTreeBoxCar";
+                    
+                }
+                else
+                {
+                    return;
+                }
+                /*
+                nodes  = p.find('.'+BoxClassName).tree('getChildren');
+                var orgcodeList = formData.orgCode.split(",");
+                for(var i=0;i<nodes.length;i++)
+                {
+                    for(var j=0;j<orgcodeList.length;j++)
+                    {
+                        if(nodes[i].id==orgcodeList[j])
+                        {
+                            p.find('.'+BoxClassName).tree('expand',nodes[i].target);
+                            if(flag)
+                            {    
+                                p.find('.'+BoxClassName).scrollTo(nodes[i].target,300,{axis:'y'});
+                                flag = false;
+                            }
+
+                        }
+                    }
+                }
+                */
+                nodes  = p.find('.'+BoxClassName).tree('getRoots');
+                var orgName = formData.orgName;
+                for(var i=0;i<nodes.length;i++)
+                {
+                    
+                        if(nodes[i].text.length>0&&orgName.length>0&&nodes[i].text.indexOf(orgName)>-1)
+                        {
+                            p.find('.'+BoxClassName).tree('expand',nodes[i].target);
+                            if(flag)
+                            {    
+                                p.find('.'+BoxClassName).scrollTo(nodes[i].target,300,{axis:'y'});
+                                flag = false;
+                            }
+
+                        }
+                   
+                }
+		p.find("#resetButton").bind("click",ResetButtonClick);
+		p.find("#searchButton").bind("click",SearchButtonClick);
+		
+		
+	}
+	//重置功能
+	function ResetButtonClick(){
+		//清空状态和部门的值
+		p.find("#orgCode").val("");
+		p.find("#orgCode_text").val("");
+	}
+	function treeOnSelect(node,checked)
+        {
+           
+            if(!p.find("."+BoxClassName).tree('isLeaf',node.target))
+            {
+                if(checked)
+                {
+                    if(node.state=='closed')
+                    {
+                    p.find("."+BoxClassName).tree('expand',node.target);
+                    onCheckFlag = true;
+                    }
+                    if(node.state=='open')
+                    {
+                        var nodes = p.find("."+BoxClassName).tree('getChildren',node.target); 
+                        var rootNode = p.find("."+BoxClassName).tree('getRoot');
+                        if(node.id==rootNode.id)
+                        {
+                             for(var i=0;i<nodes.length;i++)
+                            {
+                              p.find("."+BoxClassName).tree("check",nodes[i].target);
+                            }
+                        }
+                        
+//                        if(nodes.length>0&&tempGroupName.length<1)
+//                        {
+//                             p.find("#groupName").val(nodes[0].text);
+//                             tempGroupName=nodes[0].text;
+//                        }
+                    }
+                }
+            }
+//            else
+//            {
+//                
+//                if(tempGroupName.length<1)
+//                {
+//                    p.find("#groupName").val(node.text);
+//                     tempGroupName=node.text;
+//                }
+//            }
+           
+        }
+        function treeOnLoadSuccess(node,data)
+        {
+            
+           if(node!=null&&onCheckFlag)
+           {
+             //var nodes = p.find("."+BoxClassName).tree('getChildren',node.target); 
+             p.find("."+BoxClassName).tree('check',node.target); 
+             //if(nodes.length>0&&tempGroupName.length<1)
+            // {
+            //      p.find("#groupName").val(nodes[0].text);
+            //      tempGroupName=nodes[0].text;
+            //  }
+             
+             onCheckFlag=false;
+           }
+          
+        }
+        function showGroup()
+        {
+            
+          /*
+          var queryParams={"event":"FormEdit","content":JSON.stringify({"condition":{"userId":userData.userId}}),"extend":{}};
+          var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){
+                      var values = backJson.value;
+                      var htmlStr = "";
+                      for(var i=0;i<values.length;i++)
+                      {
+                          htmlStr+='<a href=\'#\' name=\'MSGgroup\' data-groupid=\''+values[i].id+'\'>'+values[i].qzmc+'</a></br>'
+                      }
+                     
+                      p.find("#tt").html(htmlStr);
+                      if(htmlStr.length>0)
+                      {
+                          //alert(p.find("a[name='MSGgroup']").length);
+                          p.find("a[name='MSGgroup']").bind("click",MSGgroupClick);
+                      }
+		}); 
+		Loader.POSTDATA("php/communication/GetMsgGroups_web.php",queryParams);
+                */
+        }
+        function MSGgroupClick()
+        {
+            //alert($(this).attr("data-groupid"));
+            WEBCHAT.openGroup($(this).attr("data-groupid"),true);
+        }
+        //异步树过滤器
+       function myLoadFilter(data, parent){
+			data=formatHostJson(data);//全局过滤
+			
+			var state = $.data(this, 'tree');
+			
+		    function setData(){
+		    	var serno = 1;
+		        var todo = [];
+		        for(var i=0; i<data.length; i++){
+		            todo.push(data[i]);
+		        }
+		        while(todo.length){
+		            var node = todo.shift();
+		            if (node.id == undefined){
+		            	node.id = '_node_' + (serno++);
+		            }
+		            if (node.children){
+		                node.state = 'closed';
+		                node.children1 = node.children;
+		                node.children = undefined;
+		                todo = todo.concat(node.children1);
+		            }
+		        }
+		        state.tdata = data;
+		    }
+			
+		    function find(id){
+		    	var data = state.tdata; 
+		    	var cc = [data];
+		    	while(cc.length){
+		    		var c = cc.shift();
+		    		for(var i=0; i<c.length; i++){
+		    			var node = c[i]; 
+		    			if (node.id == id){
+		    				return node;
+		    			} else if (node.children1){
+		    				cc.push(node.children1);
+		    			}
+		    		}
+		    	}
+		    	return null;
+		    }
+		    
+		    setData();
+		    
+		    var t = $(this);
+		    var opts = t.tree('options');
+		    opts.onBeforeExpand = function(node){
+	    		var n = find(node.id);
+                        if(n==null)
+                        {
+                            return;
+                        }
+	    		if (n.children && n.children.length){return}
+		    	if (n.children1){
+		    		var filter = opts.loadFilter;
+		    		opts.loadFilter = function(data){return data;};
+		    		t.tree('append',{
+		    			parent:node.target,
+		    			data:n.children1
+		    		});
+		    		opts.loadFilter = filter;
+		    		n.children = n.children1;
+		    	}
+		    };
+			return data;
+		}
+}
+</script>
+
+<!--内容部分start-->
+<!--tab标签-->
+<div class="fm_tabBox"  data-option="{'position':'top','width':120,'}"> 
+	<a  data-option="{'type':'3'}">常用人员组</a><a data-option="{'type':'1'}">部门组</a><a data-option="{'type':'2'}">巡逻组</a>
+</div>
+
+<!--表格-->
+<div class="datalist" id="tabcont">
+	<div class="listViewTemplete checkTemplete">
+    <ul class="fm_listTemp">
+    	<li><h1><span id="fssj" class="fssj"></span><span id="groupname"></span></h1><p id="groupid"></p></li>
+    </ul>
+	</div>
+	<div class="searchBox" style="height: 30px">
+		<form id="searchForm">
+	    	<table border="0" cellspacing="0" cellpadding="3" >
+	        	<tr>
+	            	<td><i>部门:</i></td>
+	            	<td>
+	              		<input  type="text" name="orgName" style="width:100px" id="orgName"/> 
+		            </td>
+					<td  width="100"  align="right" valign="top" ><a  id="searchButton" class="but-small but-red"><i class="fa fa-search"></i> 查询</a></td>
+					<td   valign="top"><a  id="resetButton" class="but-small but-blue"><i class="fa fa-search"></i> 重置</a></td>
+	        	</tr>
+			</table>
+		</form>
+	</div>
+	<div class="selectWraper" style="position:relative;width:100%;" id="selectWraper">
+		<div class="selectTreeBox" style="position:absolute;left:0px;top:0px;width:100%;overflow-y:auto">正在加载数据...</div>
+	</div>
+	<div class="selectWraperCar" style="position:relative;width:100%" id="selectWraperCar">
+		<div class="selectTreeBoxCar" style="position:absolute;left:0px;top:0px;width:100%;overflow-y:auto"></div>
+	</div>
+	<div class="searchBoxGroup" style="height: 30px">
+		<form id="searchFormGroup">
+	    	<table border="0" cellspacing="0" cellpadding="3" >
+	        	<tr>
+	            	<td>
+	               		<i>群组名:</i>
+	           		</td>
+	           		<td>
+	              		<input  type="text" name="groupName" style="width:250px" id="groupName" value="新会话"/> 
+	                	<input type="hidden" name="jqbh" id="jqbh" value=""/>
+	           		</td>
+	            	<td  width="100"  align="right" valign="top" ><a  id="createGroup" class="but-small but-red"><i class="fa fa-user-plus"></i> 创建组</a></td>
+		        </tr>
+			</table>
+		</form>
+	</div>
+	<div class="createChartGroup" style="height: 30px">
+		<form id="createChartGroup">
+	    	<table border="0" cellspacing="0" cellpadding="3" >
+	        	<tr>
+	            	<td>
+	               		<i>会话名:</i>
+	           		</td>
+	           		<td>
+	              		<input  type="text" name="chartName" style="width:130px" id="chartName" value="新会话"/> 
+	                	<input type="hidden" name="jqbh" id="jqbh" value=""/>
+	           		</td>
+	            	<td  width="100"  align="right" valign="top" ><a  id="createChart" class="but-small but-red"><i class="fa fa-user-plus"></i> 创建会话</a></td>
+	            	<td  width="100"  align="right" valign="top" ><a  id="addPerson" class="but-small but-green"><i class="fa fa-user-plus"></i> 创建常用组</a></td>
+		        </tr>
+			</table>
+		</form>
+	</div>
+</div>
+<!--内容部分end--> 
+
+
+
+

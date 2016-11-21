@@ -1,0 +1,255 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+var p=this;	  
+var FormDeal;
+var mapObj = null;
+var clustersLayer = null;
+
+var records = [];
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		p.find("#mapDiv").height(p.WRAPER.height()-p.find(".searchDiv").outerHeight(true));
+			//p.find(".mapbox").height(p.WRAPER.height()-p.find(".submitButs").outerHeight(true)).width(p.WRAPER.width()-400);
+		if(mapObj){
+			mapObj.updateSize();
+		}
+	}
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+		mapObj.destroy();
+	}
+	
+	
+	this.READY=function(){
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",function(e,option){ 
+			p.resize();
+		})
+		
+		
+		//表单格式化处理
+		FormDeal=new formDeal(p.find("#searchForm"));
+		FormDeal.parse();
+		//更新一下尺寸
+		p.resize();	
+		mapInit();
+		
+		p.find("#searchButton").bind("click",StartSearch);
+		
+	}
+	
+	function mapInit(){
+		var mapId = p.WINID+Math.floor(Math.random()*10000);
+		p.find("#eventViewMap").attr("id",mapId)
+		var olMap = new OlMap();
+		mapObj = olMap.mapInitialize(mapId,"",7);
+		var style = new OpenLayers.Style({
+					label: "${count}",
+                    graphicWidth:36,   
+					graphicHeight : 36,   
+					graphicXOffset : -18,   
+					graphicYOffset : -18,   
+					externalGraphic : "images/cluster.png" 
+                }, {
+                    context: {
+                        width: function(feature) {
+                            return (feature.cluster) ? 2 : 1;
+                        },
+                        radius: function(feature) {
+                            var pix = 2;
+                            if(feature.cluster) {
+                                pix = Math.min(feature.attributes.count, 7) + 2;
+                            }
+                            return pix;
+                        },
+						count: function (feature) {
+							clearInfoWindow(); 
+                       		return feature.attributes.count;
+                   		},
+                    }
+                });
+                
+		var strategy = new OpenLayers.Strategy.Cluster();
+		clustersLayer = new OpenLayers.Layer.Vector("违章聚合", {
+					strategies: [strategy],
+					styleMap: new OpenLayers.StyleMap({
+						"default": style,
+						"select": {
+							fillColor: "#8aeeef",
+							strokeColor: "#32a8a9"
+						}
+					})
+				})
+		var selectControl = new OpenLayers.Control.SelectFeature(clustersLayer,
+		{	
+			onSelect:function(feature){onFeatureSelect(feature)},
+			onUnselect: function(feature){onFeatureUnselect(feature)}
+		});
+		mapObj.addControl(selectControl);
+		selectControl.activate();
+		mapObj.addLayer(clustersLayer);
+	}
+	
+	function refreshCluster() {
+		if (!records || records.length==0) {
+			return;
+		}
+		
+		var features = [];
+		for (var i=0;i<records.length;i++){
+			//px = Math.random() * (122 - 121 + 0.001) + 121;
+            //py = Math.random() * (30 - 29 + 0.001) + 29;
+			if (!records[i].x||!records[i].y) {
+				continue;
+			}
+			var markerPosition = new OpenLayers.Geometry.Point(records[i].x, records[i].y);
+			//var markerPosition = new OpenLayers.Geometry.Point(px, py);
+			var f = new OpenLayers.Feature.Vector();
+				f.trafficInfo = records[i];
+				f.geometry = markerPosition;
+				features.push(f); 
+		}
+		clearInfoWindow(); 
+		clustersLayer.removeAllFeatures();
+		clustersLayer.addFeatures(features);
+
+	}
+	
+	function onFeatureSelect(ft){
+		if(ft['cluster'].length==1){
+			clearInfoWindow();
+			   var bjnr = ft['cluster'][0].trafficInfo.bjnr!=null?ft['cluster'][0].trafficInfo.bjnr:"";
+			   var jqdd = ft['cluster'][0].trafficInfo.jqdd!=null?ft['cluster'][0].trafficInfo.jqdd:"";
+			   var bjsj = ft['cluster'][0].trafficInfo.bjsj!=null?ft['cluster'][0].trafficInfo.bjsj:"";
+			   var jqjssj = ft['cluster'][0].trafficInfo.jqjssj!=null?ft['cluster'][0].trafficInfo.jqjssj:"";
+			   var stationhouse = ft['cluster'][0].trafficInfo.stationhouse!=null?ft['cluster'][0].trafficInfo.stationhouse:"";
+               var popup = new OpenLayers.Popup.FramedCloud("popup",
+                   ft.geometry.getBounds().getCenterLonLat(),
+                   null,
+                    '<div style="font-size:.9em">报警内容：'+bjnr+'<br>警情地址：'+jqdd+'<br>报警时间：'+bjsj+'<br>结束时间：'+jqjssj+'<br>所属部门：'+stationhouse+'</div>',
+                   null,
+                   false
+               );
+            ft.popup = popup;
+            mapObj.addPopup(popup);
+		}
+	}
+	
+	
+	
+	function onFeatureUnselect(feature) {
+		if(feature.popup){
+            mapObj.removePopup(feature.popup);
+            feature.popup.destroy();
+            feature.popup = null;
+		}
+   }
+	
+	/*清除所有popup*/
+	function clearInfoWindow(){
+		//selectFeature.unselectAll();
+		var popArr = mapObj.popups;
+		for (var i=0;i<popArr.length;i++){
+			mapObj.removePopup(popArr[i]);
+		}
+	}
+	
+	/*
+	function StartSearch(){
+		debugger;
+			var postData={
+					mode: 1,
+					cjjg: "",
+					limit: 9999
+				};
+			var Loader=new AJAXObj();
+			$(Loader).bind("JSON_LOADED",function(e,backJson){	
+				var result = backJson["value"];
+				records= result;
+				refreshCluster();
+			});
+			
+			Loader.POSTDATA("php/jqfj/Vilation.php",postData);
+	}
+	*/
+	
+	function StartSearch(){
+		debugger;
+		if(FormDeal.check()){ //数据校验
+			var searchCondition=FormDeal.getData();//获取表单条件
+			
+			var starttime = searchCondition['starttime'];
+			var endtime = searchCondition['endtime'];
+			if(endtime==''||starttime==''||endtime<starttime){
+				$.error("请输入正确的查询时间");
+				return;
+			}
+			
+			var postData={
+					"event":"EVENT",
+					"extend":{"eventswitch":"load"},
+					"content":{"condition":searchCondition}
+				};
+			var Loader=new AJAXObj();
+			$(Loader).bind("JSON_LOADED",function(e,backJson){	
+				records = backJson["value"];
+				refreshCluster();
+			});
+			
+			Loader.POSTDATA("php/ajfx/GetJqfx_web.php",postData);
+		}
+	}
+	
+	
+	
+	
+}
+</script>
+<!--内容部分start-->
+<div class="searchDiv">
+	<div class="searchBox">
+		<form id="searchForm">
+			<input type="hidden" value="1" name="id">
+			<table border="0" cellspacing="0" cellpadding="3">
+				<tr>
+					<td>
+						<ul>
+
+							<li>
+								<i>起始时间:</i>
+								<input style="width: 160px" class="fm_dateinput must" value=""
+									data-option="{'data':'y,m,d','force2':true}"
+									name="starttime" type="text" />
+							</li>
+							<li>
+								<i>结束时间:</i>
+								<input style="width: 160px" class="fm_dateinput must" value=""
+									data-option="{'data':'y,m,d','force2':true}"
+									name="endtime" type="text" />
+							</li>
+							<li>
+								<i>部门:</i>
+								<input  type="text" name="orgCode" id="orgCode"  style="width:160px" class="fm_popOutSelect" data-option="{'url':'pages/treeSelector_NoCascade.html','title':'部门','width':520,'height':400,'mulit':false,'locksize':true}"/>
+							</li>
+						</ul>
+						<div class="cl"></div>
+					</td>
+					<td width="65" valign="top">
+						<a id="searchButton" class="but-small but-red"><i
+							class="fa fa-search"></i> 查询</a>
+					</td>
+				</tr>
+			</table>
+		</form>
+	</div>
+</div>
+<div id="mapDiv" style="width: 100%;">
+	<div id="eventViewMap" class="mapbox"
+		style="background-color: #CCC; width: 100%; height: 100%;"></div>
+</div>
+

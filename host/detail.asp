@@ -1,0 +1,14 @@
+{
+      "head":{"code":1,"message":""},      
+      "value":{
+                    "name":"easyui",
+                    "user":"张大大",
+                    "cardtype":"easyui@gmail.com",
+                    "starttime":"2014-11-11",
+                    "endtime":"2015-12-5",
+                    "kaifa":"basic",
+                    "language":"JAVA",
+                    "idno":"2123487326564353874" 
+        },
+        "extend":{}
+}	

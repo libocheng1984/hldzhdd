@@ -1,0 +1,546 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	var layoutOption={
+		"wraper":[
+				{"width":350,"class":"layout_fixdWraper","id":"formWraper","drag":true},				
+				{"width":1,"class":"layout_contentWraper","id":"contentWraper"},
+				{"width":250,"class":"layout_fixdWraper","id":"searchWraper","drag":false}
+			],	
+			"minContWidth":200
+		};
+	var Layout;   //布局对象
+	var MapContainer;	//地图容器
+	var LeftContainer;    //表单容器
+	var FormObj;      //表单对象
+	var searchContainer; //查询容器
+	var detailAccBox;  //折叠对象	
+	var LISTPT; //点位列表
+	var LISTXL; //巡逻组列表
+	var mapObj;
+	var rwdLayer;
+	var record = {};
+	var isNewAdd=false;//新增/编辑判断
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		var H=p.WRAPER.height()-p.find(".titleWraper").outerHeight(true)-p.find(".submitButs").outerHeight(true); 
+		p.find("#layout").setRealSize(null,H);		
+		Layout.resize();
+		if(mapObj){
+				mapObj.updateSize();
+		}
+		
+	}		
+	//销毁
+	this.DESTROY=function(){ 
+		if(Layout){
+			$(Layout).unbind();
+			Layout.destroy();
+			Layout=null;	
+		}
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);	
+		
+		isNewAdd = 	p.CONDITION['isNewAdd'];
+		//生成整体布局--------	
+		Layout=new fixFreeLayout(p.find("#layout"),layoutOption);				
+			
+		//安装左侧表单容器------
+		LeftContainer=Layout.getContainerById("formWraper");
+		LeftContainer.append(p.find(".detailBox"));//插入表单
+		
+		
+		//创建折叠对象
+		detailAccBox=new AccordionFrame(p.find(".zediewindow"),true);//折叠展开设置,true,false是否只保留一个展开	
+		
+		//巡逻组--------------------------------------------------------------------------
+		var XLoption={
+			"actionFormatFun":function(RowObj){
+				RowObj.find("#deletePoint").bind("click",function(){
+					removeOnRowXL("userId",RowObj.data("data")["userId"]);	//删除操作			
+				})
+				//判断新增还是修改-----------------2015-11-25改 start
+				var newOption=RowObj.find("[name=datept]").dataOptions();
+				if(isNewAdd){
+					//修改只能选今天后
+					newOption["field"]=[{"y":0,"m":0,"d":0},{"y":0,"m":2,"d":0}];
+					RowObj.find("[name=datept]").dataOptions(newOption);
+				}else{
+					//新增可以选今天
+					newOption["field"]=[{"y":0,"m":0,"d":-1},{"y":0,"m":2,"d":0}];
+					RowObj.find("[name=datept]").dataOptions(newOption);
+				}
+				//-----------------2015-11-25改 end
+				//绑定日期选择--------------------2015-11-17 新增  datept是日期字段名
+				RowObj.find("[name=datept]").attr("readonly",true).DateSelector();	
+				RowObj.find("[name=datept]").bind("change",function(){
+					RowObj.data("data")["datept"]=$(this).val();
+				});
+			}//绑定方法
+		}
+		LISTXL=new ListView(p.find("#groupdatarow"),null,XLoption); 	
+		//点位--------------------------------------------------------------------	
+		var PToption={
+			"actionFormatFun":function(RowObj){ 
+				RowObj.find("#deletePoint").bind("click",function(){ 
+					if(rwdLayer){
+						var features = rwdLayer.getFeatureById(RowObj.data("data")["kdid"]);
+						for(var i=features.obj.length-1;i>=0;i--){
+							if(features.obj[i]['xlid']==RowObj.data("data")["xlid"]){
+								features.obj.splice(i,1);
+							}
+						}
+						if(features.obj==0){
+							removeAllFeatures(rwdLayer,features);
+						}
+					}
+					removeOnRowPT("xlid",RowObj.data("data")["xlid"]);//删除操作
+				})
+			}//绑定方法
+		}
+		LISTPT=new ListView(p.find("#pointdatarow"),null,PToption);
+		//绑定点击事件 
+		$(LISTPT).unbind("LI_CLICKED").bind("LI_CLICKED",function(e,lidata){ 
+			var name=lidata["data"]["kdid"];
+			//alert("高亮任务点："+name);
+		}) 
+		
+		
+		//安装点位查询----------------------------------------------------
+		searchContainer=Layout.getContainerById("searchWraper");
+		searchContainer.append(p.find("#searchBox"));
+		
+		//查询表单处理
+		SearchForm=new formDeal(p.find("#searchForm"));//创建表单
+		SearchForm.parse();//格式化表单
+		SearchForm.bindData(p.CONDITION);//绑定默认查询条件				
+		//绑定查询按钮点击
+		p.find("#searchButton").bind("click",StartSearch);	
+		
+		//点位表格例子------------------------------------------EasyUI组件
+		var clumoption=[[
+			{field:'kdmc',title:'点位名称',width:"48%",resizable:false,align:"center"},
+			{field:'kdsj',title:'巡逻时间',width:"50%",align:'center',formatter:function(value,record,index){
+					var result = "";
+					if(record['qsdksj']&&record['zzdksj']){
+						result = record['qsdksj']+"至"+record['zzdksj'];
+					}
+					return result;
+              }}
+			]];
+		p.find("#tt").datagrid({
+			url:"php/equip/GetRwd_web.php",
+			queryParams:{"guid":"asjdhasjd3434343"}, //附加参数对象
+			loadFilter:formatHostJson,  //格式过滤器
+			fit:true,
+			showFooter:true,//显示总计
+			rownumbers:false,//行号
+			singleSelect:true,//单选
+			fitColumns:true,//宽度自适应
+			striped:true,//条纹
+			pagination:false,//分页
+			onClickRow:dataGridClick,
+			onDblClickRow:insertToPointlist, //双击插入任务点
+			columns:clumoption
+		})
+		
+		//绑定巡逻组选择事件
+		p.find("#addxlz").bind("click",popOutXlzSelector);	
+		//地图部分------
+		MapContainer=Layout.getContainerById("contentWraper");			
+		//插入地图对象
+		MapContainer.append($('<div id="MapForZhtDingWei"></div>'));
+		//安装地图
+		var mapId = p.WINID+Math.floor(Math.random()*10000);
+		p.find("#MapForZhtDingWei").attr("id",mapId)
+		var olMap = new OlMap();
+		mapObj= olMap.mapInitialize(mapId,"",7);
+		addLayers();
+		//布局调整事件处理--------
+		$(Layout).bind("LAYOUT_RESIZE",function(){ 	
+			MapContainer.fillParent().find("#"+mapId).fillParent();	
+			MapContainer.css("overflow","hidden");
+			//重铺地图
+			p.find(".datalist").height(p.WRAPER.height()-p.find(".pageTopBox").outerHeight(true)-76); 
+			p.find("#tt").datagrid("resize"); 	
+		});
+		
+		//提交和取消按钮
+		p.find("#saveButton").bind("click",SaveForm);	
+		p.find("#cancelButton").bind("click",function(){ 
+			WINDOW.close(p.WINID);//关闭窗口
+		});		
+		
+		//表单格式化处理
+		FormObj=new  formDeal(p.find("#Detail"));
+		$(FormObj).one("HTML_FORMATED",getFormData);//绑定格式化完成事件，执行下一步
+		FormObj.parse();//格式化表单			
+		//更新一下尺寸
+		p.resize();	
+	}
+	
+	function addLayers(){
+		var rwdListeners = {
+	           'featureselected':function(evt){
+	               var feature = evt.feature;
+	               var obj = feature.obj;
+	               var innerHtml = "<div style='font-size:.9em'>点位信息";
+	               for(var i=0;i<obj.length;i++){
+	               		if(i==0){	
+	               		innerHtml =  innerHtml+"<br>——————————————————<br>点位名称："+obj[i].kdmc+"<br>巡逻时间："+obj[i].kdsj+"<br>应打次数："+obj[i].ydcs+"<br>间隔时间（秒）："+obj[i].jgsj;
+	               		}else{
+	               		innerHtml =  innerHtml+"<br>——————————————————<br>巡逻时间："+obj[i].kdsj+"<br>应打次数："+obj[i].ydcs+"<br>间隔时间（秒）："+obj[i].jgsj;
+	               		}
+	               }
+	               innerHtml = innerHtml+"</div>";
+	               var popup = new OpenLayers.Popup.FramedCloud("popup",
+	                   OpenLayers.LonLat.fromString(feature.geometry.toShortString()),
+	                   null,
+	                   innerHtml,
+	                   null,
+	                   false
+	               );
+	               feature.popup = popup;
+	               mapObj.addPopup(popup);
+	           },
+	           'featureunselected':function(evt){
+	               var feature = evt.feature;
+	               mapObj.removePopup(feature.popup);
+	               feature.popup.destroy();
+	               feature.popup = null;
+	           }
+	       }
+	     rwdLayer = new OpenLayers.Layer.Vector("point",{displayInLayerSwitcher:false});
+	     rwdLayer.events.on(rwdListeners);
+		 mapObj.addLayer(rwdLayer);
+		 var selector = new OpenLayers.Control.MySelectFeature([rwdLayer],{
+			autoActivate:true,
+			hover: true,
+			highlightOnly:true
+		});
+		mapObj.addControl(selector);
+	}
+	
+	function addFeature(rowData){
+		if(!rwdLayer){
+			return;
+		}
+		var obj = [];
+		var features = rwdLayer.getFeatureById(rowData.kdid);
+		if(!features){
+			var img = "images/zhdd/rwd.png";
+			var point = OpenLayers.Geometry.fromWKT(rowData.geometry);
+			
+			var ft = new OpenLayers.Feature.Vector();
+			ft.geometry = point;
+			ft.id = rowData.kdid;
+			ft.style = {
+				cursor: "pointer",
+				label: rowData.kdmc,
+				fontWeight: "bold",
+				fontColor:"#ffffff",
+				labelOutlineWidth: 3,
+				labelOutlineColor: "#4089be",
+				labelYOffset:-26,
+				labelXOffset:0,
+				graphicWidth:24,   
+				graphicHeight : 24,   
+				graphicXOffset : -12,   
+				graphicYOffset : -12, 
+				externalGraphic : img
+			};
+			obj.push(rowData);
+			ft.info = rowData;
+			ft.obj = obj;
+			rwdLayer.addFeatures(ft);
+		}else{
+			features.obj.push(rowData);
+		}
+		var point = OpenLayers.Geometry.fromWKT(rowData['geometry']);
+		point = new OpenLayers.LonLat(point.x, point.y); 
+		mapObj.setCenter(point);
+	}	
+	
+	/*清除相对应的feature*/
+	function removeAllFeatures(vector,geometry){
+		var vectors = new Array();
+		vectors.push(geometry);
+		vector.removeFeatures(vectors);
+	}
+	
+	//弹出巡逻组选择
+	function popOutXlzSelector(){
+		WINDOW.open({"name":p.WINID+"rwGroupSelector","width":600,"height":600,"url":"pages/equip/rwGroupSelector.html","callback":function(result){insertToXlzlist(result)},"title":"选择人员","lock":true},{"method":"update","parentid":p.WINID,"rowData":[]},$(this));
+		//var winoption={"name":"datagrid_"+index,"width":600,"height":600,"url":"pages/equip/rwGroupSelector.html","callback":function(result){insertToXlzlist(result,rowData)},"title":"巡逻组","lock":true},{"method":"update","parentid":p.WINID,"rowData":rowData}};
+		//var winoption={"name":"XLZXZ_window","title":"选择巡逻组","url":"pages/XL_xlzselector.html","width":800,"height":550,"locksize":true,"lock":true,"callback":insertToXlzlist,"mulit":true};
+		//WINDOW.open(winoption,{},$(this));
+	}		
+	//选中数据插入巡逻组列表
+	function insertToXlzlist(values){
+		//debugger;
+		 for(var i=0;i<values.length;i++){						  
+			  var haveInert=LISTXL.find("userId",values[i]["userId"]);
+			  if(!haveInert){ //判断是否已存在
+				  LISTXL.insert(values[i],0);//在前面插入一行
+				  LISTXL.uncheckAll();
+			  }else{
+				  LISTXL.findAndCheck("userId",values[i]["userId"],true);	
+			  }
+		 }	
+		detailAccBox.open("part_3");
+		LeftContainer.scrollTo(p.find("#part_3"),500);
+	}
+
+	//点位查询结果行点击
+	function dataGridClick(rowIndex,rowData){ 
+		//alert("点位高亮");
+		//var tr=$.getDatagridTr(p.find("#tt"),rowIndex); 
+	}
+	
+	//删除一个符合条件的巡逻组(字段名,值)
+	function removeOnRowXL(field,value){
+		LISTXL.findAndRemove(field,value);	//删除	
+	}
+	//删除一个符合条件的任务点(字段名,值)
+	function removeOnRowPT(field,value){
+		LISTPT.findAndRemove(field,value);	//删除	
+	}
+	
+	//点位查询结果行双击插入表单的点位列表
+	function insertToPointlist(rowIndex,rowData){
+		if(rowData['qsdksj']&&rowData['zzdksj']){
+			rowData['kdsj'] = rowData['qsdksj']+"至"+rowData['zzdksj'];
+		}
+		//debugger;
+		//判断两点之间的距离
+		var firstPoint = OpenLayers.Geometry.fromWKT(rowData.geometry);
+		var firstMarker = new OpenLayers.LonLat(firstPoint.x,firstPoint.y);
+		var Points=LISTPT.getData();
+		 for(var i=0;i<Points.length;i++){	
+		 	if(Points[i]['kdid']==rowData['kdid']){
+		 		continue;
+		 	}
+		 	var nextPoint = OpenLayers.Geometry.fromWKT(Points[i].geometry);					  
+			 var nextMarker = new OpenLayers.LonLat(nextPoint.x,nextPoint.y);
+			 var dist = OpenLayers.Util.distVincenty(firstMarker,nextMarker)*1000;
+			 if(dist<100){
+			 	$.message("两点距离不能少于100米！");
+			 	return;
+			 }
+		 }
+		var haveInert=LISTPT.find("xlid",rowData["xlid"]);
+		if(!haveInert){ //判断是否已存在
+			LISTPT.insert(rowData,0);//在前面插入一行
+			LISTPT.uncheckAll();
+			addFeature(rowData);
+		}else{
+			LISTPT.findAndCheck("xlid",rowData["xlid"],true);	
+		}
+		detailAccBox.open("part_2");
+		LeftContainer.scrollTo(p.find("#part_2"),500);
+	}
+	
+	//查询点位
+	function StartSearch(){
+		if(SearchForm.check()){ //数据校验
+			var searchCondition=SearchForm.getData();//获取表单条件
+			//刷新DataGrid
+			p.find("#tt").datagrid("reload",searchCondition);
+		}
+	}
+	
+	//保存数据
+	function SaveForm(){
+		
+		if(FormObj.check()){ //数据校验
+			//获取表单数据
+			formData=FormObj.getData();
+			//保存失败
+			var errorBack=function(e){				
+				p.find("#saveButton").removeClass("disable");//解按钮
+			}
+			//保存成功
+			var saveResult=function(e,BackJson){
+				
+				$.message("保存成功！",2000);
+				saveRoadLength(BackJson['value']['rwid'],formData);
+				WINDOW.close(p.WINID);//关闭窗口
+				//刷新父窗体--
+				WINDOW.run(p.CONDITION["parentid"],"refesh");//执行父窗体refesh方法
+			}
+			//获取点位数据
+			var Points=LISTPT.getData();
+			formData["dianwei"]=Points||[]; //合并点数据
+			if(formData["dianwei"].length==0){
+				$.alert("点位未设置。");
+				return;
+			}
+			//获取巡逻组数据
+			var Xunluozhus=LISTXL.getData();		
+			formData["xunluozhu"]=Xunluozhus||[];//合并巡逻组数据
+			if(formData["xunluozhu"].length==0){
+				$.alert("警员未设置。");
+				return;
+			}
+			//saveRoadLength("1",formData);
+			//return;
+			p.find("#saveButton").addClass("disable");//锁按钮			
+			var postData={"event":"saveForm",
+									"extend":{"eventswitch":"save"},
+									"content":{"condition":p.CONDITION,"value":formData}
+									};		
+			var Loader=new AJAXObj();
+			$(Loader).unbind().one("JSON_LOADED",saveResult).one("SYS_ERROR",errorBack);			
+			Loader.POSTDATA("php/equip/InsertOrUpdateRw_web.php",postData);
+		}
+	}
+	
+	function saveRoadLength(id,data){
+		
+		var dianweiArr = data['dianwei'];
+		var stops = "";
+		for(var i=0;i<dianweiArr.length;i++){
+			var geometry = dianweiArr[i]['geometry'];
+			var point = OpenLayers.Geometry.fromWKT(geometry);
+			stops += point.x+","+point.y+";"
+		}
+		stops = stops.substr(0,stops.length-1);
+		console.log(stops);
+		mainWindow.getMorePathAnalysis(id,stops);
+		
+	}
+	
+	//获取表单数据，编辑状态
+	function getFormData(){
+		if(p.CONDITION['rowData']){
+			record=$.extend(true,{},p.CONDITION['rowData'])
+			FormObj.bindData(record);//绑定数据	
+			LISTXL.bindData(record["xunluozhu"]); //把巡逻组数据(数组)绑定到巡逻列表
+			LISTPT.bindData(record["dianwei"]);		//把任务点数据(数组)绑定到点列表
+			var dianweiArr = record["dianwei"];
+			 for(var i=0;i<dianweiArr.length;i++){						  
+			 	addFeature(dianweiArr[i]);
+			 }	
+		}else{
+			FormObj.bindData();//绑定数据	
+			LISTXL.bindData(); //把巡逻组数据(数组)绑定到巡逻列表
+			LISTPT.bindData();	
+		}
+//		var Loader=new AJAXObj();
+//		$(Loader).bind("JSON_LOADED",function(e,backJson){			
+//			FormObj.bindData(backJson["value"]);//绑定数据	
+//			LISTXL.bindData(backJson["value"]["xunluozhu"]); //把巡逻组数据(数组)绑定到巡逻列表
+//			LISTPT.bindData(backJson["value"]["dianwei"]);		//把任务点数据(数组)绑定到点列表
+//		})
+//		Loader.POSTDATA("php/equip/GetRwById_web.php",{"event":"FormEdit","content":{"condition":p.CONDITION['rowData']},"extend":{}});				
+	}	
+	
+}
+</script>
+<!--内容部分start-->
+
+<div id="layout">布局容器</div>
+<!--附件内容--> 
+<!--查询-->
+<div id="searchBox">
+  <div class="pageTopBox">
+    <div class="pageSubtitle">任务点选择</div>
+    <div class="searchBox">
+      <form id="searchForm">
+      <i>名称:</i>
+                <input  type="text" name="kdmc" class="must" style="width:134px" />
+              <a  id="searchButton" class="but-small but-red"><i class="fa fa-search"></i> 查询</a>
+              
+<!--        <table border="0" cellspacing="0" cellpadding="3" width="100%">
+          <tr>
+            <td width="45" align="right"><i>名称:</i></td>
+            <td><input  type="text" name="name" class="must" style="width:150px" /></td>
+            <td  align="right"   valign="top" nowrap="nowrap"><a  id="searchButton" class="but-small but-red"><i class="fa fa-search"></i></a></td>
+          </tr>
+        </table>-->
+      </form>
+    </div>
+  </div>
+  <!--表格-->
+  <div class="datalist">
+    <div id="tt"></div>
+  </div>
+</div>
+
+<!--表单-->
+<div class="detailBox" id="formWraper">
+  <form id="Detail">
+    <div class="zediewindow">
+      <div  data-option="{'title':'基本信息','open':true}" id="part_1">
+      	<input name="rwid"  type="hidden"  style="width:200px" />
+        <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+          <tr>
+            <th width="100" align="right"><i>任务名称</i></th>
+            <td><input name="rwmc" class="must"  type="text"  style="width:200px" /></td>
+          </tr>
+        </table>
+      </div>
+      <div  data-option="{'title':'任务点','open':true}" id="part_2">
+        <div class="splittitle">任务点信息</div>
+        <div id="pointdatarow" class="tabblock" style="padding:8px;">
+          <div class="contBlock">
+            <table width="100%" border="0" cellspacing="0" cellpadding="0">
+              <tr>
+                <th width="80" align="right">点位名称</th>
+                <td  id="kdmc">&nbsp;</td>
+              </tr>
+              <tr>
+                <th align="right">巡逻时间</th>
+                <td id="kdsj">&nbsp;</td>
+              </tr>
+              <tr>
+                <th align="right">应打次数</th>
+                <td id="ydcs">&nbsp;</td>
+              </tr>
+              <tr>
+                <th align="right">&nbsp;</th>
+                <td align="right" ><a class="but-small but-red" id="deletePoint">删除</a></td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div  data-option="{'title':'添加人员','open':true}" id="part_3">
+        <div class="splittitle">人员信息</div>
+        <div style="padding:8px;text-align:center" class="actionBox"> <a class="but-small but-green" id="addxlz">增加警员</a> </div>
+        <div id="groupdatarow" class="tabblock"  style="padding:8px;">
+          <div class="contBlock">
+            <table width="100%" border="0" cellspacing="0" cellpadding="0">
+              <tr>
+                <th width="100" align="right">警员姓名</th>
+                <td id="userName">&nbsp;</td>
+              </tr>
+              <tr>
+                <th align="right">所属派出所</th>
+                <td id="orgName">&nbsp;</td>
+              </tr>
+               <th align="right">任务执行日期</th>
+                <td ><input name="datept" type="text" id="datept" class="fm_dateselectinput must" style="width:160px;"  value="" data-option="{'format':'normal','force2':true,'field':[{'y':0,'m':0,'d':0},{'y':0,'m':2,'d':0}]}"/></td>
+              <tr>
+                <th align="right">&nbsp;</th>
+                <td align="right"><a class="but-small but-red" id="deletePoint">删除</a></td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+<!--提交按钮-->
+<div class="submitButs"><a  id="saveButton" class="but-normal but-red"><i class="fa fa-save"></i> 保存</a> <a  id="cancelButton" class="but-normal but-yellow"> <i class="fa fa-reply"></i> 取消</a></div>
+<!--内容部分end--> 

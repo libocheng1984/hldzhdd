@@ -1,0 +1,197 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	var record = "";
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		p.find(".formBox").height(p.WRAPER.height()-p.find(".submitButs").outerHeight(true));
+	}
+	
+	//表单对象
+	var SubmitForm;
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+		
+		//表单例子------------------------------------------
+		var method = p.CONDITION['method'];
+		//debugger;
+		//表单格式化处理
+		SubmitForm=new formDeal(p.find("#Form"));
+		if(method=="add"){
+			p.find("#cjrname").val(userData.userName);
+			p.find("#cjbmmc").val(userData.orgName);
+			SubmitForm.parse();
+			p.find("#saveButton").bind("click",SaveForm);
+			p.find("#cancelButton").bind("click",function(){ 
+				WINDOW.	close(p.WINID);//关闭窗口
+			});
+		}else{
+			$(SubmitForm).one("HTML_FORMATED",getFormData);//绑定格式化完成事件，执行下一步
+			SubmitForm.parse();
+		}
+			
+		
+		//表单组件例子------------------------------------------
+		
+		//更新一下尺寸
+		p.resize();	
+	}
+	
+	//编辑状态，获取数据
+	function getFormData(){ 
+		//debugger;
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){
+			record = backJson["value"];			
+			SubmitForm.bindData(backJson["value"]);//绑定数据		
+			p.find("#saveButton").bind("click",SaveForm);			
+		})
+		Loader.POSTDATA("php/yagl/GetEventPlanByid_web.php",{"event":"FormEdit","content":{"condition":p.CONDITION['rowData']},"extend":{}});				
+		p.find("#cancelButton").bind("click",function(){ 
+			WINDOW.	close(p.WINID);//关闭窗口
+		});
+	}
+	
+	//提交保存
+	function SaveForm(){
+		if(SubmitForm.check()){ //数据校验
+			//保存失败
+			var errorBack=function(e){				
+			}	
+			//保存成功
+			var saveResult=function(e,BackJson){
+				$.message("保存成功！",2000);
+				var parentWindow=WINDOW.getActionById(p.CONDITION["parentid"]);//通过窗体ID找到窗体对象（ACTION）
+				parentWindow.refesh(); //执行父窗体方法
+				WINDOW.	close(p.WINID);//关闭窗口
+			}
+			//获取表单数据
+			if(record){
+				formData=SubmitForm.getData();
+				formData['yabh']=record['yabh'];
+				p.find("#saveButton").addClass("disable");//锁按钮			
+				var postData={"event":"saveForm",
+										"extend":{"eventswitch":"update"},
+										"content":{"condition":p.CONDITION,"value":formData}
+										};		
+				var Loader=new AJAXObj();
+				$(Loader).unbind().one("JSON_LOADED",saveResult).one("SYS_ERROR",errorBack);			
+				Loader.POSTDATA("php/yagl/UpdateEventPlan_web.php",postData);
+			}else{
+				formData=SubmitForm.getData();
+				p.find("#saveButton").addClass("disable");//锁按钮			
+				var postData={"event":"saveForm",
+										"extend":{"eventswitch":"save"},
+										"content":{"condition":p.CONDITION,"value":formData}
+										};		
+				var Loader=new AJAXObj();
+				$(Loader).unbind().one("JSON_LOADED",saveResult).one("SYS_ERROR",errorBack);			
+				Loader.POSTDATA("php/yagl/InsertEventPlan_web.php",postData);
+			}
+			
+		}
+	}
+}
+</script>
+<!--内容部分start-->
+<!--表单-->
+
+<div class="formBox">
+  <form id="Form">
+    <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab">
+      <tr>
+        <th width="120" align="right"><i>预案标题</i></th>
+        <td><input name="ajbt"  type="text" class="must" style="width:300px" />
+        </td>
+      </tr>
+      <tr>
+        <th align="right"><i>案件类别</i></th>
+        <td><select  style="width:300px" name="ajlb" class="must">
+        	<option value="">--请选择--</option>
+            <option value="1">社会安全突发公共事件</option>
+            <option value="2">自然灾害性突发公共事件</option>
+            <option value="3">事故灾难性突发公共事件</option>
+            <option value="4">突发公共卫生事件</option>
+          </select>
+          </td>
+      </tr>
+      <tr>
+        <th align="right"><i>案件级别</i></th>
+        <td><select  style="width:300px" name="ajjb" class="must">
+        	<option value="">--请选择--</option>
+            <option value="1">I级</option>
+            <option value="2">II级</option>
+            <option value="3">III级</option>
+            <option value="4">IV级</option>
+          </select>
+          </td>
+      </tr>
+      <tr>
+        <th align="right"><i>预案类别</i></th>
+        <td><select  style="width:300px" name="yalb" class="must">
+        	<option value="">--请选择--</option>
+            <option value="1">总体应急预案</option>
+            <option value="2">专项应急预案</option>
+            <option value="3">应急保障预案</option>
+            <option value="4">部门应急预案</option>
+          </select>
+          </td>
+      </tr>
+      <tr>
+        <th align="right"><i>处置级别</i></th>
+        <td><select  style="width:300px" name="czjb" class="must">
+        	<option value="">--请选择--</option>
+            <option value="1">I级指挥处置</option>
+            <option value="2">II级指挥处置</option>
+            <option value="3">III级指挥处置</option>
+            <option value="4">IV级指挥处置</option>
+          </select>
+          </td>
+      </tr>
+      <tr>
+        <th align="right"><i>预案体系</i></th>
+        <td><select  style="width:300px" name="yatx" class="must">
+        	<option value="">--请选择--</option>
+            <option value="1">市局应急预案体系</option>
+            <option value="2">区、市、县（分）局应急预案体系</option>
+          </select>
+          </td>
+      </tr>
+      <tr>
+        <th align="right"><i>创建人</i></th>
+        <td><input id="cjrname" name="cjrname"  type="text" class="fm_actioninput must" style="width:300px" disabled="disabled"/>
+        </td>
+      </tr>
+      <tr>
+        <th width="120" align="right"><i>创建部门</i></th>
+        <td><input id="cjbmmc" name="cjbmmc"  type="text" class="fm_actioninput must" style="width:300px" disabled="disabled"/>
+        </td>
+      </tr>
+      <tr>
+        <th align="right"><i>启动人</i></th>
+        <td><input  type="text" name="userId"  style="width:300px" class="fm_popOutSelect must" data-option="{'url':'pages/plan/policeTreeSelector.html','title':'启动人','width':600,'height':600,'mulit':false}" />
+        </td>
+      </tr>
+      <tr>
+        <th align="right"><i>预案内容</i></th>
+        <td>
+        <div class="fm_uploadFilesShow upfilebox" data-option="{'rel':'yanr','editable':true}"></div>
+        <input  type="text" name="yanr"  style="width:300px"  class="fm_uploadFile must" data-option="{'mulit':false,'url':'php/system/uploadFile.php'}" /></td>
+      </tr>
+    </table>
+  </form>
+</div>
+<!--提交按钮-->
+<div class="submitButs"><a  id="saveButton" class="but-normal but-red"><i class="fa fa-save"></i> 保存</a> <a  id="cancelButton" class="but-normal but-yellow"> <i class="fa fa-reply"></i> 取消</a></div>
+<!--内容部分end-->

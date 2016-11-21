@@ -1,0 +1,178 @@
+<meta charset="utf-8">
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	
+	//窗口缩放尺寸设置
+	this.resize=function(){
+		p.find(".datalist").height(p.WRAPER.height()-p.find(".pageTopBox").outerHeight(true));		//option["height"]	
+		p.find("#tt").datagrid("resize"); 
+	}
+	var SearchForm;
+	this.READY=function(){
+		
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",function(e,option){ 
+			p.resize();
+		});
+                SearchForm=new formDeal(p.find("#searchForm"));
+		SearchForm.parse();
+		SearchForm.bindData(p.CONDITION);//绑定默认条件
+		//初始化查询文本框赋值
+		p.find("#orgCode_text").val(userData.orgName);
+		var postData={
+					"event":"EVENT",
+					"extend":JSON.stringify({"eventswitch":"load"}),
+					"content":JSON.stringify({"condition":{"orgCode":userData.orgCode,"jqclzt":'5'}})
+				};
+		
+		var clumoption=[[
+			{field:'jqbh',title:'警情编号',width:180,fixed:true,align:"center",formatter:function(value,record,index){
+                                        
+					return value.substring(value.length<4?0:value.length-4);
+              }},
+			{field:'jjrbh',title:'席位号',width:"60px",sortable:true,align:"center",sorter:function(a,b){  
+					a = a.split('/');  
+					b = b.split('/');  
+					if (a[2] == b[2]){  
+						if (a[0] == b[0]){  
+							return (a[1]>b[1]?1:-1);  
+						} else {  
+							return (a[0]>b[0]?1:-1);  
+						}  
+					} else {  
+						return (a[2]>b[2]?1:-1);  
+					}  
+			}},
+			{field:'jqlxdm',title:'类型',width:"12%",align:"center",formatter:function(value,record,index){
+	               var result = util.getAjlx(value);
+					return result;
+             }},
+			{field:'bjnr',title:'警情内容',width:"25%"},
+			{field:'orgName',title:'管辖单位',width:"20%",align:"center"},
+			{field:'bjsj',title:'报警时间',width:150,fixed:true,align:"center"},
+            {field:'jqjssj',title:'警情结束时间',width:150,fixed:true,align:"center"}
+			]];	
+			
+		p.find("#tt").datagrid({
+			url:"php/event/GetOverEventl_web.php",
+			queryParams:postData, //附加参数对象
+			loadFilter:formatHostJson,  //格式过滤器
+			fit:true,
+			remoteSort:false,
+			showFooter:true,//显示总计??
+			rownumbers:true,//行号
+			singleSelect:true,
+			fitColumns:true,//宽度自适应
+			striped:true,//条纹
+			pagination:true,//分页
+			columns:clumoption,
+                        rowStyler:function(index,row){
+			if (row.jqzk==4){
+                              p.find("tr[datagrid-row-index='"+index+"']").find("td").css("color","red");
+                              //return 'background-color:#6293BB;color:#fff;';
+                            }
+                        },
+			onDblClickRow:onDblClickRow
+			
+		})
+		//更新一下尺寸
+		p.resize();
+                p.find("#searchButton").bind("click",search);
+                var d = new Date();
+                var str = '';
+                str += d.getFullYear()+'-';
+                var month =d.getMonth() + 1;
+                month=month<10?"0"+month:month;
+                str  +=month+'-';
+                var date = d.getDate();
+                date=date<10?"0"+date:date;
+                str  += date;
+               
+                 p.find("#jqjssj").val(str);
+                 p.find("#bjsj").val(str);
+                  //绑定查询按钮点击
+		p.find("#clear").bind("click",clearform);
+		
+	}
+        function clearform()
+        {
+            p.find("#orgCode").val(userData.orgCode);
+            p.find("#orgCode_text").val(userData.orgName);
+            p.find("#jqjssj").val("");
+            p.find("#bjsj").val("");
+            p.find("#xwh").val("");
+            p.find("#jqbh_end4").val("");
+            p.find("#zdjq").get(0).checked=false;
+            p.find("#zdjq").change();
+        }
+	function search(){
+		if(SearchForm.check()){ //数据校验
+			var formData =SearchForm.getData(); //数据校验
+		   if(p.find("#orgCode").val().length<1)
+		   {
+			   formData.orgCode=userData.orgCode;
+			   
+			   }
+			var searchCondition={"event":"EVENT","content":JSON.stringify({"condition":formData}),"extend":JSON.stringify({"eventswitch":"load"})};
+			;//获取表单条件
+			//刷新DataGrid
+			p.find("#tt").datagrid("reload",searchCondition);
+			p.find("#tt2").datagrid("reload",searchCondition);
+		}
+	}
+	function onDblClickRow(rowIndex, rowData){
+		WINDOW.open({"name":rowIndex+'_eventViewLBC',"width":600,"height":400,"url":"pages/zhdd/eventViewLBC.html","title":"警情详细",'position':'left_bottom'},{"record":rowData,"winId":p.WINID},p.find("#tt").datagrid("getPanel"));
+	}
+	
+	
+}
+</script>
+<div class="pageTopBox">
+<!--内容部分start-->
+<div class="searchBox">
+    <form id="searchForm">
+        <input type="hidden" value="5" name="jqclzt"/>
+    <input id="userId" name="userId" value="" type="hidden"/>
+      <table border="0" cellspacing="0" cellpadding="3">
+        <tr>
+          <td><ul>
+               <li> <i>部门:</i>
+               <input  type="text" name="orgCode" id="orgCode"  style="width:160px" class="fm_popOutSelect" data-option="{'url':'pages/treeSelector_NoCascade.html','width':520,'height':400,'mulit':false,'locksize':true}"/>
+              </li>
+              <li> <i>席位号:</i>
+                  <input  type="text" name="xwh" style="width:160px" id="xwh"/>
+              </li>
+               <li> <i>报警时间:</i>
+                <input style="width:160px"  class="fm_dateinput"  value="2014-05-31"  data-option="{'data':'y,m,d','force2':true}"  name="bjsj" type="text" id="bjsj"/>
+              </li>
+              <li> <i>结束时间:</i>
+                <input style="width:160px"  class="fm_dateinput"  value="2014-05-31"  data-option="{'data':'y,m,d','force2':true}"  name="jqjssj" type="text" id="jqjssj"/>
+              </li>
+               <li> <i>警情编号:</i>
+                <input  type="text" name="jqbh_end4" style="width:160px" id="jqbh_end4"/>
+              </li>
+            </ul>
+            <div class="cl"></div></td>
+          <td width="65"   valign="top">
+              <label><input type="checkbox" name="zdjq" value="1" class="fm_noAutoPost" id="zdjq"/><i>重大警情</i></label>
+          </td>
+          <td width="65"   valign="top"><a  id="searchButton" class="but-small but-red"><i class="fa fa-search"></i> 查询</a></td>
+          <td width="65"   valign="top"><a  id="clear" class="but-small but-blue"><i class="fa fa-search"></i> 重置</a></td>
+        </tr>
+      </table>
+    </form>
+  </div>
+</div>
+<!--表格-->
+<div class="datalist">
+  <div id="tt"> </div>
+</div>
+
+
+<!--内容部分end-->
+

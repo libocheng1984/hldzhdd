@@ -1,0 +1,21 @@
+{
+      "head":{"code":1,"message":""},     
+      "value":[{
+                "value":1,
+                "text":"我是动态加载的"
+            },{
+                "value":2,
+                "text":"C#"
+            },{
+                "value":3,
+                "text":"长江街",
+                "selected":true
+            },{
+                "value":4,
+                "text":"派出所"
+            },{
+                "value":5,
+                "text":"人迷解放军"
+            }],
+      "extend":{}
+}

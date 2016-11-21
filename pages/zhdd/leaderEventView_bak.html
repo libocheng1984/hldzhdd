@@ -1,0 +1,1137 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;		
+	var util = new Util();	
+	var mapObj_event = null;
+	var eventPoint=null;
+	var record = null;
+	var Detailobj;
+	var fkuiObj;
+	var bjxxobj;
+	var fjxxobj;
+	var detailAccBox;
+	var chuJingDan;
+	var featureMarker = null;
+	var eventDetailLayer = null;
+	var eventDetailLayerMarker = null;
+	var groupLayer = null;
+	var eventRecord = {};
+	var groupMarkerArray = new Array();
+	var eventMarkerArray = new Array();
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		p.WRAPER.css("overflow","hidden")
+		p.find(".detailBox").css("overflow","hidden");//.addClass("beforeresize");
+		p.find(".detailBox,.zediewindow").height(p.WRAPER.height()-p.find(".submitButs").outerHeight(true))
+		p.find(".zediewindow").css("overflow-y","auto");
+		//这个是粘江岸的
+		if(mapObj_event){
+			p.find(".mapbox").height(p.WRAPER.height()-p.find(".submitButs").outerHeight(true)).width(p.WRAPER.width()-400);
+			mapObj_event.updateSize();
+		}
+		
+	}
+		
+	//表单对象
+	 
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+		$(document).unbind("addEventDetailData",eventJqtz);
+		//这个是粘江岸的
+		if(mapObj_event){
+			mapObj_event.destroy();
+			mapObj_event=null;
+		}
+	}
+	
+	this.READY=function(){
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+		
+		//返回按钮事件
+		p.find("#cancelButton").bind("click",function(){
+			WINDOW.close(p.WINID);//关闭窗口
+		});
+		//表单例子------------------------------------------
+		fkuiObj=new formDeal(p.find("#Fankui"));		
+		fkuiObj.parse();
+		bjxxobj=new detailDeal(p.find("#bjxx"));
+		bjxxobj.parse();
+		fjxxobj=new detailDeal(p.find("#fjxx"));
+		fjxxobj.parse();
+		//表单格式化处理
+		Detailobj=new formDeal(p.find("#Detail"));//(".zediewindow"));
+		//Detailobj=new formDeal(p.find(".zediewindow"));//(".zediewindow"));
+		if(!p.CONDITION["newrecord"]){			
+			p.CONDITION["newrecord"]=$.extend({},p.CONDITION["record"]);			
+		}
+		record = p.CONDITION["newrecord"];
+		detailAccBox=new AccordionFrame(p.find(".zediewindow"),false);//折叠展开设置,true,false是否只保留一个展开
+		eventJqtz(null,record,"1");
+		Detailobj.parse();			
+		
+		chuJingDan=new ChuJingAction(p.find("#part_3"));
+		$(document).unbind("addEventDetailData",eventJqtz);
+		$(document).bind("addEventDetailData",eventJqtz);
+		//更新一下尺寸
+		p.find("[name=belong]").readonly();
+	    p.find("[name=scene]").readonly();
+		p.resize();	
+	}	
+	
+	function mapInit(){
+		var mapId = p.WINID+Math.floor(Math.random()*10000);
+		p.find("#eventViewMap").attr("id",mapId)
+		var olMap = new OlMap();
+		mapObj_event = olMap.mapInitialize(mapId,"",7);
+		
+		
+		eventDetailLayer = new OpenLayers.Layer.Vector("警情");
+		eventDetailLayer.style = {
+			graphicWidth:32,   
+			graphicHeight : 32,   
+			graphicXOffset : -16,   
+			graphicYOffset : -16,   
+			externalGraphic : "images/zhdd/jingqing_1.png"
+		}
+		eventDetailLayerMarker = new OpenLayers.Control.DrawFeature(eventDetailLayer, OpenLayers.Handler.Point);
+		eventDetailLayerMarker.events.on({"featureadded" : function(drawGeometryArgs){
+			
+			if(featureMarker){
+				removeAllFeatures(eventDetailLayer,featureMarker);
+			}
+			featureMarker = drawGeometryArgs.feature;
+			getOrgArea(featureMarker.geometry.x,featureMarker.geometry.y);
+			eventRecord['marker_event'] = featureMarker;
+			var mhjqzb = eventRecord['marker_event'].geometry.toString();
+		}});
+		
+		mapObj.addControls([eventDetailLayerMarker]);
+		mapObj_event.addLayer(eventDetailLayer);
+		p.find(".mapicon").bind("click",setMapCenter);
+	}
+	
+	function setMapCenter(){
+		if(eventPoint!=null){
+			mapObj_event.setCenter(eventPoint);
+		}
+	}
+	
+	
+	//编辑状态，获取数据
+	function getFormData(){
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){
+		  record= backJson["value"]['records'];
+			var jqclzt = util.getJqclzt(record.jqclzt);
+			var bjfs = util.getBjfs(record.bjfs);
+			var jjlx = util.getJjlx(record.jjlx);
+			var jjfs = util.getJjfs(record.jjfs);
+			var ajlx = util.getAjlx(record.jqlxdm);
+			var ajlb = util.getAjlb(record.jqlbdm);
+			var xb = util.getSex(record.bjrxbdm);
+			Detailobj.bindData(record);//绑定数据
+			bjxxobj.bindData(record);	
+			p.find("#jqclzt").text(jqclzt);
+			p.find("#bjfs").text(bjfs);
+			p.find("#jjlx").text(jjlx);
+			p.find("#jjfs").text(jjfs);
+			p.find("#jqlxdm").text(ajlx);
+			p.find("#jqlbdm").text(ajlb);
+			p.find("#bjrxbdm").text(xb);
+			//从新修改后赋值不成功的部分从新赋值
+			p.find("#searchButton").bind("click",SearchButtonClick);
+			p.find("#mapButton").bind("click",mapButtonClick);
+			p.find("#saveButton").bind("click",SaveForm);
+			
+			p.find("#searchButton").text('定位中...');
+			var address = p.find("#jqdd").text();
+			p.getDefaultLocation(address);
+		})
+		Loader.POSTDATA("php/event/GetNormalEventById_web.php",{"event":"FormEdit","content":{"condition":{"jqid":record['jqid']}},"extend":{}});				
+	}
+	
+	function getFormDataEnd(){
+		//alert(123);
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){	
+			record= backJson["value"]['records'];
+			var jqclzt = util.getJqclzt(record.jqclzt);
+			var bjfs = util.getBjfs(record.bjfs);
+			var jjlx = util.getJjlx(record.jjlx);
+			var jjfs = util.getJjfs(record.jjfs);
+			var ajlx = util.getAjlx(record.jqlxdm);
+			var ajlb = util.getAjlb(record.jqlbdm);
+			var xb = util.getSex(record.bjrxbdm);
+			record['jqzk']=JSON.parse("["+record['jqzk']+"]");
+			Detailobj.bindData(record);//绑定数据	
+			bjxxobj.bindData(record);
+			fjxxobj.bindData(record);
+			p.find("#bmdm_text").val(record.orgname);
+			p.find("#bmdm").readonly();
+			p.find("#jqdjdm").readonly();
+			p.find("[name=jqzk]").readonly();
+			p.find("#jqclzt").text(jqclzt);
+			p.find("#bjfs").text(bjfs);
+			p.find("#jjlx").text(jjlx);
+			p.find("#jjfs").text(jjfs);
+			p.find("#jqlxdm").text(ajlx);
+			p.find("#jqlbdm").text(ajlb);
+			//p.find("#jqdjdm").text(jqdj);
+			p.find("#bjrxbdm").text(xb);
+			var processRecords = record['processRecords'];
+			
+			p.find("#tt").datagrid("loadData",processRecords);
+			//getFormDatafeedBack(record.jqid);	
+		})
+		Loader.POSTDATA("php/event/GetEventById_web.php",{"event":"FormEdit","content":{"condition":{"jqid":record['jqid']}},"extend":{}});				
+		
+	}
+	
+		//编辑状态，获取数据
+	function getFormDatafeedBack(jqid){ 
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){ //alert(backJson)
+			feedBackRecord= backJson["value"]['records'];
+			if(!feedBackRecord)
+				return;
+				
+			//feedBackRecord.belong="1";
+			//feedBackRecord.scene="1";
+			p.find("[name=belong]").readonly(false);
+	        p.find("[name=scene]").readonly(false);
+			fkuiObj.bindData(feedBackRecord);//绑定数据
+			feedBackData(jqid);
+			p.find("[name=belong]").readonly();
+	        p.find("[name=scene]").readonly();
+			//var aa=  $.extend({},j1,j2)
+			p.find("#part_4").find("#hzdjdm_fk").text(feedBackRecord.hzdjdm);
+			p.find("#part_4").find("#qhwdm_fk").text(feedBackRecord.qhwdm);
+			p.find("#part_4").find("#qhjzjgdm_fk").text(feedBackRecord.qhjzjgdm);
+			p.find("#part_4").find("#hzcsdm_fk").text(feedBackRecord.hzcsdm);
+			p.find("#part_4").find("#ssrs_fk").text(feedBackRecord.ssrs);
+			p.find("#part_4").find("#swrs_fk").text(feedBackRecord.swrs);		
+		})
+		Loader.POSTDATA("php/event/GetFeedbackByJqid.php",{"event":"FormEdit","content":{"condition":{"jqid":jqid}},"extend":{}});				
+		
+	}
+	
+	function feedBackData(jqid){
+		var Loader_resouce=new AJAXObj();
+		$(Loader_resouce).bind("JSON_LOADED",function(e,backJson){	
+			var records= backJson["value"]['records'];
+			if(records.length>0){
+				var imgObj = "";
+				var andioObj = "";
+				for(var i=0;i<records.length;i++){
+					if(imgObj==""&&records[i]['zylx']=="1"){
+						imgObj+=records[i]['zydz'];
+						continue;
+					}else if(andioObj==""&&records[i]['zylx']=="2"){
+						andioObj+=records[i]['zydz'];
+						continue;
+					}
+					
+					if(records[i]['zylx']=="1"){
+						imgObj+=","+records[i]['zydz'];
+					}else if(records[i]['zylx']=="2"){
+						andioObj+=","+records[i]['zydz'];
+					}
+				}
+				//alert(imgObj);
+				p.find("#imgTd").changeValue(imgObj); //alert(p.find("#imgAudio").length)
+				p.find("[name=imgAudio]").changeValue(andioObj);
+			}
+		})
+		Loader_resouce.POSTDATA("php/event/GetFileByJqid_web.php",{"event":"FormEdit","content":{"condition":{"jqid":jqid}},"extend":{}});
+	}
+	//获取处警单数据
+	function getFormData_CJD(jqid,callback){
+		//alert(12312312);
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){	
+			var listData=backJson["value"]['records'];			
+			chuJingDan.clear();
+			for(var i=0;i<listData.length;i++){
+				//插入处警单
+				listData[i].cjdzt=util.getCjdzt(listData[i].cjdzt);
+				chuJingDan.addChuJingDan(listData[i],"cjd_"+i);
+				//插入指令单
+				var zlddata=listData[i]["commandRecords"];
+				for(var j=0;j<zlddata.length;j++){
+					zlddata[j].jqztdm=util.getJqclzt(zlddata[j].jqztdm);
+					zlddata[j].zlbs=util.getZlbs(zlddata[j].zlbs);
+					var zhilingdan=chuJingDan.addZhiLingDan("cjd_"+i,zlddata[j]);
+					if(zlddata[j].zlbs=="增援")
+					{
+						zhilingdan.find("tr.zyzlDeleteSj").hide();
+					}
+					if(zlddata[j].zlbs=="首接"){
+						zhilingdan.find("tr.zlnrDeleteSj").hide();
+					}
+				}
+			}
+			//callback();//回调展开
+		})
+		Loader.POSTDATA("php/event/GetProcessById_web.php",{"event":"FormEdit","content":{"condition":{"jqid":jqid}},"extend":{}});				
+	}
+	
+	
+	function eventJqtz(e,data,initBs)
+	{
+		 var jqid = data.jqid;
+		 var jqzt  = data.jqclzt;
+		 if(jqid!=record['jqid']){
+		 	return;
+		 }
+		 if(jqzt!=null&&jqzt=='1')
+		 {
+			 $(Detailobj).one("HTML_FORMATED",getFormData);
+			 detailAccBox.disableBar(3,true,"（尚无处警单）");//禁止第2个展开
+			 detailAccBox.disableBar(4,true,"（尚无反馈）");//禁止第3个展开
+			 detailAccBox.disableBar(5,true,"（尚无警情辅助）");//禁止第3个展开
+			 p.find("#saveButton").show();
+			 p.find("#cancelButton").hide();
+			 p.find("#searchButton").show();
+			 p.find("#mapButton").show(); 
+		 }
+		 else
+		 {	
+		 	getFormDataEnd();
+		 	getFormDatafeedBack(data.jqid);
+		 	// $(Detailobj).one("HTML_FORMATED",getFormDataEnd);
+			// $(Detailobj).one("HTML_FORMATED",function(){getFormDatafeedBack(data.jqid)});
+			//不是初始化的时候 
+			if(initBs!="1")
+			{
+				if(jqzt!=null&&jqzt!='5')
+				{
+					detailAccBox.disableBar(3,false);
+					detailAccBox.setFlash(3,true);//加闪烁
+					detailAccBox.disableBar(4,true,"（尚无反馈）");//禁止第3个展开
+			 		detailAccBox.disableBar(5,true,"（尚无警情辅助）");//禁止第3个展开
+				}
+				else
+				{	
+					detailAccBox.disableBar(3,false);//禁止第2个展开
+					detailAccBox.disableBar(4,false);//禁止第3个展开
+					detailAccBox.disableBar(5,false);//禁止第3个展开
+					detailAccBox.setFlash(3,true);//加闪烁
+					detailAccBox.setFlash(4,true);
+					detailAccBox.setFlash(5,true);
+				}
+				 
+			}
+			//是初始化的时候
+			else
+			{
+				
+				if(jqzt!=null&&jqzt=='5')
+				{
+					detailAccBox.disableBar(3,false);
+					detailAccBox.disableBar(4,false);//禁止第3个展开
+					detailAccBox.disableBar(5,false);//禁止第3个展开	
+				}
+				else
+				{
+					detailAccBox.disableBar(3,false);
+					detailAccBox.disableBar(4,true,"（尚无反馈）");//禁止第3个展开
+			 		detailAccBox.disableBar(5,true,"（尚无警情辅助）");//禁止第3个展开
+				}
+			}
+			getFormData_CJD(data.jqid);
+			/*
+			 $(detailAccBox).bind("ACC_LOAD",function(e,Vars){
+			 switch(Vars["id"]){
+				case "part_3":
+					//处警单局部加载-----
+					getFormData_CJD(data.jqid,Vars["callback"]);
+					break;
+			}
+		})
+		    */
+			 p.find("#cancelButton").show();
+			 p.find("#saveButton").hide();
+			 p.find("#searchButton").hide();
+			 p.find("#mapButton").hide();
+			 
+		 }
+		record.jqclzt=data.jqclzt;
+		p.CONDITION["newrecord"].jqclzt=data.jqclzt;
+		 
+	}
+	
+	function SearchButtonClick(){
+		var address = p.find("#jqdd").text();
+		WINDOW.open({"name":p.WINID+"_searchButton","width":670,"height":400,"url":"pages/zhdd/addressGrid.html","title":"地址定位","lock":true,'position':'left_center'},{"address":address,"winId":p.WINID},p.find("#searchButton"));
+	}
+
+	this.getDefaultLocation = function(address) {
+		//查询默认地址		
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){
+			var value = backJson['value'];
+			value = value.replace(/\s/g,"");
+			value = eval("("+value+")");
+			addArr = value['data'];
+			for (var i=0;i<bmdmData.length;i++) {
+				if(addArr[0]['pcsdm']==bmdmData[i]['orgCode']){
+					addArr[0]['parentCode']=bmdmData[i]['parentCode'];
+					addArr[0]['parentName']=bmdmData[i]['parentName'];
+					addArr[0]['orgName']=bmdmData[i]['orgName'];
+				}
+			}
+			p.addEventMarker(addArr[0]['dzqc'],addArr[0]['zbx'],addArr[0]['zby'],addArr[0]['pcsdm'],addArr[0]['orgName']);
+			p.find("#searchButton").text('定位');
+		});
+		$(Loader).bind("SYS_ERROR",function(e,msg){
+			$.error("全文检索失败!");
+		});
+		address = encodeURI(address);
+		var url = "http://10.78.17.154:9999/bls?operation=FullTextRetrieval_GetAddressByName_v001&license=a756244eb0236bdc26061cb6b6bdb481&content={%20%22data%22:[%20{%20%22address%22:%22" + address + "%22%20}%20],%20%22pageindex%22:0,%20%22pagesize%22:10%20}";
+		var postData={
+			"event":"TRANS",
+			"extend":{"eventswitch":"search"},
+			"content":{"condition":{"url":url}}
+		};
+		Loader.POSTDATA("php/trans.php",postData);
+	}
+	
+	function mapButtonClick(){
+		var mapDiv = p.find("#mapDiv").css("display");
+		if(mapDiv=="none"){
+				p.find("#mapDiv").css("display","block");
+				p.find(".zediewindow").css("width","450px");
+				mapInit();
+				p.resize();// by Carl
+		}
+		
+		eventDetailLayerMarker.activate();
+	}
+	
+	function confiremEvent(){
+		var bmdm = p.find("#bmdm").val();
+		var mhjqzb = eventRecord['marker_event'].geometry.toString();
+		var jqdjdm = p.find("[name=jqdjdm]").val();
+		var postData={
+					"event":"STATION",
+					"extend":{"eventswitch":"load"},
+					"content":{"condition":{
+									"jqid":record['jqid'],
+									"mhjqzb":mhjqzb,
+									"orgCode":bmdm,
+									"hphm":eventRecord['hphm_event'],
+									"bjnr":record['bjnr'],
+									"fwjqdz":eventRecord['fwjqdz_event'],
+									"jqdjdm":jqdjdm,
+									"jqdd":record['jqdd'],
+									"jqzk":eventRecord['jqzk_event']
+								}}
+				};
+					
+			var Loader=new AJAXObj();
+			p.find("#saveButton").unbind();
+			$(Loader).bind("JSON_LOADED",function(e,backJson){	
+				//alert(JSON.stringify(backJson));
+				if(backJson['head']['code']==1){
+					if(backJson['value']['result']=='true'){
+						//$.message("派警成功!");
+						$.message(backJson['value']['errmsg'],100000);
+						WINDOW.close(p.WINID);
+					}else{
+						$.error(backJson['value']['errmsg']);
+						p.find("#saveButton").bind("click",SaveForm);
+					}
+					
+				}
+			});
+			$(Loader).bind("SYS_ERROR",function(e,msg){
+				p.find("#saveButton").bind("click",SaveForm);
+				$.error("该派警失败!");
+			});
+			Loader.POSTDATA("php/event/UpdateSationCar_web.php",postData);
+	}
+	
+	//提交保存
+	function SaveForm(){
+		var groups = new Array();
+		var bmdm = p.find("#bmdm").val();
+		var jqdjdm = p.find("[name=jqdjdm]").val();
+		var jqzk = p.find("[name=jqzk]").val();
+		var jqzk = "";
+		var obj = Detailobj.getData();
+		if(obj['jqzk']){
+			jqzk = obj['jqzk'].toString();
+		}
+		eventRecord['jqzk_event']=jqzk;
+		if(bmdm==""){
+			$.message("请搜索一个管辖区域!");
+			return;
+		}
+		if(!eventRecord['marker_event']){
+			$.message("请预标一个地理位置!");
+			return;
+		}
+		var postData={
+				"event":"STATION",
+				"extend":{"eventswitch":"load"},
+				"content":{"condition":{"orgCode":bmdm}}
+			};
+		eventRecord['gxdwdm_event']=bmdm;	
+		eventRecord['jqdjdm_event']=jqdjdm;		
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){	
+			groups = backJson['value'];
+			//alert(JSON.stringify(groups));
+			if(groups.length>0){
+				if(groups.length==1){
+					eventRecord['hphm_event']= groups[0]['hphm'];
+					confiremEvent();
+				}else{
+					WINDOW.open({"name":p.WINID+"_saveButton","width":600,"height":250,"url":"pages/zhdd/policeSation.html","title":"巡逻车辆",'position':'left_center'},{"record":record,"winId":p.WINID,"groups":groups,"eventRecord":eventRecord},p.find("#saveButton"));
+				}
+			}else{
+				$.message("该派出所没有绑定组合!");
+			}
+		});
+		Loader.POSTDATA("php/system/GetNormalGroup.php",postData);
+	}
+	
+	this.addEventMarker = function(address,x,y,substationCode,orgName){
+		
+		var mapDiv = p.find("#mapDiv").css("display");
+		if(mapDiv=="none"){
+				p.find("#mapDiv").css("display","block");
+				p.find(".zediewindow").css("width","450px");
+				mapInit();
+				p.resize();// by Carl
+		}
+		
+		p.find("#jqdz").text(address);
+		//alert(p.find("[name=bmdm]").length);
+		//alert(substationCode);
+		p.find("[name=bmdm]").val(substationCode);
+		p.find("[name=bmdm_text]").val(orgName);
+		eventRecord['fwjqdz_event'] = address;
+		eventRecord['gxdwdm_event'] = substationCode;
+		if(featureMarker){
+			removeAllFeatures(eventDetailLayer,featureMarker);
+		}
+		addEventDataMarker(x,y);
+		
+		
+		eventPoint = new OpenLayers.LonLat(x,y);
+		mapObj_event.setCenter(eventPoint);
+	}
+	
+	/**
+	 * addEventDataMarker
+	 * 添加警情点覆盖物
+	 */
+	function addEventDataMarker(x,y) {
+		point = new OpenLayers.Geometry.Point(x,y)
+		img = "images/zhdd/jingqing_1.png";
+		featureMarker = new OpenLayers.Feature.Vector();
+					featureMarker.geometry = point;
+					featureMarker.style = {
+						graphicWidth:32,   
+						graphicHeight : 32,   
+						graphicXOffset : -16,   
+						graphicYOffset : -16, 
+						externalGraphic : img
+					};
+		featureMarker.trafficInfo = record;
+		eventRecord['marker_event'] = featureMarker;
+		eventDetailLayer.addFeatures(featureMarker);
+	}
+	
+	
+	/*清除相对应的feature*/
+	function removeAllFeatures(vector,geometry){
+		var vectors = new Array();
+		vectors.push(geometry);
+		vector.removeFeatures(vectors);
+	}
+	
+	function getOrgArea(lon, lat) {	
+		var url = "http://10.80.8.204:8090/JYYW/SZPCS.ashx?x="+lon+"&y="+lat+"&includeGeometry=1";
+		var postData={
+			"event":"TRANS",
+			"extend":{"eventswitch":"search"},
+			"content":{"condition":{"url":url}}
+		};
+		//console.log(url);
+		var Loader = new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){
+			//alert(JSON.stringify(backJson));
+			var value = backJson['value'];
+			var status = $(value).find("Status").text();
+			if(status!="Success"){
+				return;
+			}
+
+			var codeObj = $(value).find("ORGCODE");
+			var nameObj = $(value).find("ORGNAME");
+			var orgCode = codeObj[0].innerHTML;
+			var orgName = nameObj[0].innerHTML;
+			
+			for (var j=0;j<bmdmData.length;j++) {
+				if(orgCode == bmdmData[j]['orgCode']){
+					var parentName = bmdmData[j]['parentName'];
+					p.find("[name=bmdm_text]").val(parentName+"-"+orgName)
+					p.find("[name=bmdm]").val(orgCode);
+					break;
+				}
+			}
+		});
+		$(Loader).bind("SYS_ERROR",function(e,msg){
+			$.error("调用失败!");
+		});
+		Loader.POSTDATA("php/trans.php",postData);
+	}
+}
+</script>
+<!--地图部分-->
+<div id="mapDiv" style="position:relative;height:0px;width:100%;">
+<div id="eventViewMap" class="mapbox" style="background-color:#CCC;position:absolute;left:450px;top:0px;width: 250px;height: 400px;"></div>
+<div class="mapicon center" style="top:3px;right:3px"><i class="fa fa-crosshairs"></i></div>
+</div>
+<!--表单-->
+<div class="detailBox">
+   <form id="Detail">
+  <div class="zediewindow">
+<div  data-option="{'title':'警情基本信息','open':true}" id="part_1">
+       <!-- 警情基本信息 -->
+     <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+	  <tr>
+	    <th width="20%" align="right"><i>警情编号</i></th>
+	    <td width="27%"><span id="jqbh"></span></td>
+	     <th width="20%" align="right"><i>报警类别</i></th>
+	    <td width="33%"><span id="jqlxdm"></span></td>
+	  </tr>
+	   <tr>
+	    <th align="right"><i>报警电话</i></th>
+	    <td><span id="bjdh"></span></td>
+	     <th align="right"><i>报警时间</i></th>
+	    <td><span id="bjsj"></span></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>警情摘要</i></th>
+	    <td colspan="3"><span id="bjnr"></span></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>警情地址</i></th>
+	    <td colspan="3"><span id="jqdd"></span><a  id="searchButton" class="but-small but-green">定位</a><a  id="mapButton" class="but-small but-green">预标</a></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>警情详址</i></th>
+	    <td colspan="3"><span id="jqdz"></span></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>下派部门</i></th>
+	    <td colspan="3"><span id="stationhouse"></span></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>派发部门</i></th>
+	    <td colspan="3"> <input  type="text" name="bmdm" id="bmdm"  style="width:300px" class="fm_popOutSelect" data-option="{'url':'pages/treeSelector.html','width':500,'height':400,'mulit':false}" /></td>
+	  </tr>
+	</table>
+    </div>
+	 <div  data-option="{'title':'警情相关信息','open':false}" id="part_6">
+	 <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+	  <tr>
+        <th align="right"><i>警情状况</i></th>
+        <td colspan="3"><label><input  type="checkbox" name="jqzk" value="1"/>八大类案件</label><label><input  type="checkbox" name="jqzk" value="2"/>正在发生</label>
+        <label><input  type="checkbox" name="jqzk" value="3"/>有人员伤亡,造成重大损失</label>
+        </td>
+      </tr>
+      <tr>
+        <th align="right"><i>重大警情</i></th>
+        <td colspan="3"><label><input  type="checkbox" name="jqzk" value="4"/><font id="ldgz">领导关注</font></label>
+        </td>
+      </tr>
+	  <tr>
+	    <th align="right"><i>案件级别</i></th>
+	    <td><select  style="width:100px" name="jqdjdm" id="jqdjdm">
+            <option value="一般" selected="selected">一般</option>
+            <option value="严重">严重</option>
+            <option value="重大">重大</option>
+          </select></td>
+        <th align="right"><i>警情状态</i></th>
+	    <td><span id="jqclzt"></span></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>接警类型</i></th>
+	    <td><span id="jjlx"></span></td>
+	    <th align="right"><i>报警类型</i></th>
+	    <td><span id="bjfs"></span></td> 
+	  </tr>
+	  <tr>
+	    <th align="right"><i>警情类别</i></th>
+	    <td><span id="jqlbdm"></span></td>
+	    <th align="right"><i>接警方式</i></th>
+	    <td><span id="jjfs"></span></td>
+	  </tr>
+	</table>
+	 </div>
+     <div  data-option="{'title':'报警信息','open':false}" id="part_2">
+     <div id="bjxx">
+        <div class="splittitle">报警人信息</div>
+       <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab">
+         <tr>
+             <th width="15%" align="right"><i>报警人</i></th>
+               <td width="35%"><span id="bjrxm"></span></td>
+               <th width="15%" align="right"><i>性别</i></th>
+               <td width="35%"><span id="bjrxbdm"></span></td>
+            </tr>
+            <tr>
+               <th align="right"><i>报警电话</i></th>
+               <td><span id="bjdh"></span></td>
+               <th align="right"><i>联系电话</i></th>
+               <td><span id="lxdh"></span></td>
+          	</tr>
+          	<tr>
+               <th align="right"><i>电话地址</i></th>
+               <td  colspan="3"><span id="bjdhyhdz"></span></td>
+         	</tr>
+          </table>
+        <div class="splittitle">接警信息</div>
+          <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+			<tr>
+               <th width="15%" align="right"><i>席位号</i></th>
+               <td width="35%"><span id="jjrbh"></span></td>
+               <th width="15%" align="right"><i>管辖单位</i></th>
+               <td width="35%"><span id="orgname"></span></td>
+            </tr>
+            <tr>
+               <th align="right"><i>接警时间</i></th>
+               <td colspan="3"><span id="jjsj"></span></td>
+            </tr>
+          </table>
+        </div> 
+     </div>
+    <div data-option="{'title':'处警信息','open':false}"  id="part_3">
+   <!-- 处警单0 必须有-->
+      <div class="block" id="chujingdan_0">
+        <div class="blocktitle"><em>处警单编号：</em><span id="cjdbh">123456</span></div>
+          <p> <em>派警时间：</em><span id="pjsj">2015-02-32 12:23:34 </span><em>处警单状态：</em><span id="cjdzt">完成</span></p>
+        <div class="blockPart" id="zhiling_0">
+          <h1><em>指令编号：</em><span id="zlbh">987654</span></h1>
+          <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+             <tr>
+              <th align="right"><i>指令标识</i></th>
+              <td><span id="zlbs"/></td>
+            </tr>
+             <tr>
+              <th width="80" align="right"><i>人员编号</i></th>
+              <td><span id="rybh"/></td>
+            </tr>
+            <tr>
+              <th align="right"><i>姓名</i></th>
+              <td><span id="xm"/></td>
+            </tr>
+            <tr  class="zyzlDeleteSj">
+              <th align="right"><i>处警领导</i></th>
+              <td><span id="cjld"/></td>
+            </tr>
+            <tr class="zyzlDeleteSj">
+              <th align="right"><i>下达时间</i></th>
+              <td><span id="zlxdsj"/></td>
+            </tr>
+            <tr class="zyzlDeleteSj">
+              <th align="right"><i>接收时间</i></th>
+              <td><span id="zljssj"/></td>
+            </tr>
+            <tr class="zyzlDeleteSj">
+              <th align="right"><i>到达现场时间</i></th>
+              <td><span id="ddxcsj"/></td>
+            </tr>
+            <tr class="zyzlDeleteSj">
+              <th align="right"><i>处理完毕时间</i></th>
+              <td><span id="clwbsj"/></td>
+            </tr>
+             <!-- 
+             <tr>
+              <th align="right"><i>处理结果代码</i></th>
+              <td><span id="cljgdm"/></td>
+            </tr>
+             <tr>
+              <th align="right"><i>出动车辆情况</i></th>
+              <td><span id="cdclqk"/></td>
+            </tr>
+             <tr>
+              <th align="right"><i>出动人员情况</i></th>
+              <td><span id="cdryqk"/></td>
+            </tr>
+             <tr>
+              <th align="right"><i>警情状态代码</i></th>
+              <td><span id="jqztdm"/></td>
+            </tr>
+            -->
+            <tr>
+              <th align="right"  class="zlnrDeleteSj"><i>指令信息</i></th>
+              <td><span id="zlnr"/></td>
+            </tr>
+             <tr>
+              <th align="right"><i>处理结果</i></th>
+              <td><span id="cljg"/></td>
+            </tr>
+			<tr>
+              <th align="right"><i>处警人</i></th>
+              <td><span id="cjr"/></td>
+            </tr>
+			<tr>
+              <th align="right"><i>出动警力</i></th>
+              <td><span id="cdjl"/></td>
+            </tr>
+           <tr>
+              <th align="right"><i>机动车次</i></th>
+              <td><span id="jidongcheci">1</span></td>
+            </tr>
+          </table>
+        </div>
+        <div class="blockPart">
+          <h1><em>指令编号：</em>987654</h1>
+          <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+            <tr>
+              <th width="80" align="right"><i>姓名</i></th>
+              <td><span id="name"/></td>
+            </tr>
+            <tr>
+              <th align="right"><i>证件类型</i></th>
+              <td><span id="cardtype"/></td>
+            </tr>
+            <tr>
+              <th align="right"><i>身份证</i></th>
+              <td><span id="idno"/></td>
+            </tr>
+            <tr>
+              <th align="right"><em>录入人</em></th>
+              <td><span id="user"/></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+      
+      <!-- 处警单1-->
+      <div class="block">
+        <div class="blocktitle"><em>处警单号：</em>123456
+        </div>
+        <p> <em>派警时间：</em>2015-02-32 12:23:34 <em>状态：</em>完成</p>
+        <div class="blockPart">
+          <h1><em>指令编号：</em>987654</h1>
+          <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+            <tr>
+              <th width="80" align="right"><i>姓名</i></th>
+              <td><span id="name"/></td>
+            </tr>
+            <tr>
+              <th align="right"><i>证件类型</i></th>
+              <td><span id="cardtype"/></td>
+            </tr>
+            <tr>
+              <th align="right"><i>身份证</i></th>
+              <td><span id="idno"/></td>
+            </tr>
+            <tr>
+              <th align="right"><em>录入人</em></th>
+              <td><span id="user"/></td>
+            </tr>
+          </table>
+        </div>
+        <div class="blockPart">
+          <h1><em>指令编号：</em>987654</h1>
+          <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+            <tr>
+              <th width="80" align="right"><i>姓名</i></th>
+              <td><span id="name"/></td>
+            </tr>
+            <tr>
+              <th align="right"><i>证件类型</i></th>
+              <td><span id="cardtype"/></td>
+            </tr>
+            <tr>
+              <th align="right"><i>身份证</i></th>
+              <td><span id="idno"/></td>
+            </tr>
+            <tr>
+              <th align="right"><em>录入人</em></th>
+              <td><span id="user"/></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div data-option="{'title':'反馈信息','open':false}"  id="part_4">
+    <form id="Fankui">
+      <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+        <tr>
+	    <th align="right"><i>反馈图片</i></th>
+	    <td colspan="3"><div class="fm_uploadPicsShow uppicbox" data-option="{'rel':'xyzd','editable':false}"></div>
+          <input  type="hidden" name="xyzd" id="imgTd"  /></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>反馈语音</i></th>
+	    <td colspan="3" id="imgYx"> <input  type="text" name="imgAudio" class="fm_voicePlay" /></td>
+	  </tr>     
+      <tr>
+      	<th align="right"><i>&nbsp;</i></th>
+        <td colspan="3">
+        <label><input type="checkbox" name="belong" value="1" class="fm_noAutoPost"/>属于街面</label>
+        <label><input type="checkbox" name="scene" value="1"  class="fm_noAutoPost"/>已立/拟立</label>        
+        </td>
+      </tr>
+      </table>
+      
+	   <div class="splittitle">案件反馈信息</div>
+       <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+      <tr>
+        <th width="20%" align="right"><i>反馈单编号</i></th>
+		<td><span id="fkdbh"></span></td>
+        <th width="20%" align="right"><i>反馈员编号</i></th>
+		<td><span id="fkybh"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>反馈人姓名</i></th>
+		<td><span id="fkyxm"></span></td>
+        <th align="right"><i>抓获人数</i></th>
+		<td><span id="zhrs"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>涉案人数</i></th>
+		<td><span id="sars"></span></td>
+        <th align="right"><i>救助人数</i></th>
+		<td><span id="jzrs"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>救助人说明</i></th>
+		<td colspan="3"><span id="jzrssm"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>解救人数</i></th>
+		<td><span id="jjrs"></span></td>
+        <th align="right"><i>逃跑人数</i></th>
+		<td><span id="tprs"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>解救人说明</i></th>
+		<td colspan="3"><span id="jjrssm"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>解救妇女人数</i></th>
+		<td><span id="jjfvrs"></span></td>
+        <th align="right"><i>解救儿童人数</i></th>
+		<td><span id="jjetrs"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>受伤人数</i></th>
+		<td><span id="ssrs_fk"></span></td>
+        <th align="right"><i>死亡人数</i></th>
+		<td><span id="swrs_fk"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>受伤人数说明</i></th>
+		<td colspan="3"><span id="ssrssm"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>死亡人数说明</i></th>
+		<td colspan="3"><span id="swrssm"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>待救援人数</i></th>
+		<td><span id="djyrs"></span></td>
+        <th align="right"><i>出警人员受伤人数</i></th>
+		<td><span id="cjryssrs"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>出警人员死亡人数</i></th>
+		<td><span id="cjryswrs"></span></td>
+        <th align="right"><i>留置审查人数</i></th>
+		<td><span id="lzscrs"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>经济损失</i></th>
+		<td colspan="3"><span id="jjssqk"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>挽回经济损失</i></th>
+		<td colspan="3"><span id="whjjssqk"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>是否破获刑事案件</i></th>
+		<td><span id="sfphxsaj"></span></td>
+        <!--<td><input  type="radio" name="sfphxsaj" value="1"/>是&nbsp;<input  type="radio" name="sfphxsaj" value="2"/>否</td>-->
+        <th align="right"><i>是否查处治安案件</i></th>
+		<td><span id="sfcczaaj"></span></td>
+        <!--<td><input  type="radio" name="sfcczaaj" value="1"/>是&nbsp;<input  type="radio" name="sfcczaaj" value="2"/>否</td>-->
+      </tr>
+      <tr>
+        <th align="right"><i>是否解决纠纷</i></th>
+		<td colspan="3"><span id="sfjjjf"></span></td>
+        <!--<td colspan="3"><input  type="radio" name="sfjjjf" value="1"/>是&nbsp;<input  type="radio" name="sfjjjf" value="2"/>否</td>-->
+      </tr>
+      <tr>
+        <th align="right"><i>警情处理结果</i></th>
+		<td colspan="3"><span id="jqcljg"></span></td>
+        <!--<td colspan="3"><input  type="text" name="jqcljg"  style="width:96%" /></td>-->
+      </tr>
+      </table>
+       <div class="splittitle">消防反馈信息</div>
+      <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+      <tr>
+        <th width="20%" align="right"><i>火灾等级代码</i></th>
+		<td><span id="hzdjdm_fk"></span></td>
+        <th width="20%" align="right"><i>天气情况代码</i></th>
+		<td><span id="tqqkdm"></span></td>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>火灾原因代码</i></th>
+		<td><span id="hzyydm"></span></td>
+        <th width="20%" align="right"><i>灾害事故类型代码</i></th>
+		<td><span id="zhsglxdm"></span></td>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>起火物代码</i></th>
+		<td><span id="qhwdm_fk"></span></td>
+        <th width="20%" align="right"><i>起火建筑结构代码</i></th>
+		<td><span id="qhjzjgdm_fk"></span></td>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>火灾场所代码</i></th>
+		<td><span id="hzcsdm_fk"></span></td>
+        <th width="20%" align="right"><i>现场总指挥</i></th>
+		<td><span id="xczzh"></span></td>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>第一出动时间</i></th>
+		<td><span id="dycdsj"></span></td>
+        <!--<td width="30%"><input style="width:200px"  class="fm_dateinput"  value=""  data-option="{'data':'y,m,d,h,t,s','force2':true}"  name="dycdsj" type="text" /></td>-->
+        <th width="20%" align="right"><i>第一到场时间</i></th>
+		<td><span id="dydcsj"></span></td>
+        <!--<td width="30%"><input style="width:200px"  class="fm_dateinput"  value=""  data-option="{'data':'y,m,d,h,t,s','force2':true}"  name="dydcsj" type="text" /></td>-->
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>火场扑灭时间</i></th>
+		<td><span id="hcpmsj"></span></td>
+        <!--<td width="30%"><input style="width:200px"  class="fm_dateinput"  value=""  data-option="{'data':'y,m,d,h,t,s','force2':true}"  name="hcpmsj" type="text" /></td>-->
+        <th width="20%" align="right"><i>撤离时间</i></th>
+		<td><span id="clsj"></span></td>
+        <!--<td width="30%"><input style="width:200px"  class="fm_dateinput"  value=""  data-option="{'data':'y,m,d,h,t,s','force2':true}"  name="clsj" type="text" /></td>-->
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>出动水枪数</i></th>
+		<td><span id="cdsqs"></span></td>
+        <th width="20%" align="right"><i>下落不明人数</i></th>
+		<td><span id="xlbmrs"></span></td>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>是否重点单位</i></th>
+		<td><span id="sfzddw"></span></td>
+        <!--<td width="30%"><input  type="radio" name="sfzddw" value="1"/>是&nbsp;<input  type="radio" name="sfzddw" value="2"/>否</td>-->
+        <th width="20%" align="right"><i>重点单位名称</i></th>
+		<td><span id="zddwbm"></span></td>
+        <!--<td width="30%"><input  type="text" name="zddwbm"  style="width:200px" /></td>-->
+      </tr>
+      </table>
+       <div class="splittitle">交通反馈信息</div>
+      <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+      <tr>
+        <th width="20%" align="right"><i>交通事故形态代码</i></th>
+		<td><span id="jtsgxtdm"></span></td>
+        <th width="20%" align="right"><i>是否装载危险品</i></th>
+		<td><span id="sfwhp"></span></td>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>交通事故初查原因代码</i></th>
+		<td><span id="sgccyydm"></span></td>
+        <th width="20%" align="right"><i>能见度代码</i></th>
+		<td><span id="njddm"></span></td>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>路面状况代码</i></th>
+		<td><span id="lmzkdm"></span></td>
+        <th width="20%" align="right"><i>损坏机动车数</i></th>
+		<td><span id="shjdcs"></span></td>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>损坏非机动车数</i></th>
+		<td><span id="shfjdcs"></span></td>
+        <th width="20%" align="right"><i>道路类型代码</i></th>
+		<td><span id="dllxdm"></span></td>
+      </tr>
+      </table>
+      </form>
+     
+    </div>
+      <div data-option="{'title':'警情辅助信息','open':false}"  id="part_5">
+      <div id="fjxx">
+        <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+          <tr>
+            <th width="20%" align="right"><i>有无爆炸</i></th>
+            <td width="30%"><span id="ywbzxl"></span></td>
+             <th width="20%" align="right"><i>号牌种类</i></th>
+            <td width="30%"><span id="bjchpzldm"></span></td>
+          </tr>
+          <tr>
+            <th align="right"><i>报警车牌号</i></th>
+            <td><span id="bjcph"></span></td>
+            <th align="right"><i>被困人数</i></th>
+            <td><span id="bkrs"></span></td>
+          </tr>
+          <!--tr>
+            <th align="right"><i>受伤人数</i></th>
+            <td><span id="ssrs"></span></td>
+            <th align="right"><i>死亡人数</i></th>
+            <td><span id="swrs"></span></td>
+          </tr-->
+          <tr>
+            <th align="right"><i>是否涉外</i></th>
+            <td><span id="sfsw"></span></td>
+            <th align="right"><i>外语报警</i></th>
+            <td><span id="sfswybj"></span></td>
+          </tr>
+          <tr>
+            <th align="right"><i>警情状态</i></th>
+            <td><span id="jqztdm"></span></td>
+            <th align="right"><i>作案工具</i></th>
+            <td><span id="zagjdm"></span></td>
+          </tr>
+          <tr>
+            <th align="right"><i>警情等码</i></th>
+            <td><span id="jqztdm"></span></td>
+            <th align="right"><i>火灾等级</i></th>
+            <td><span id="hzdjdm"></span></td>
+          </tr>
+          <tr>
+            <th align="right"><i>起火建筑结构</i></th>
+            <td><span id="qhjzjgdm"></span></td>
+            <th align="right"><i>火灾场所</i></th>
+            <td><span id="hzcsdm"></span></td>
+          </tr>
+          <tr>
+            <th align="right"><i>毗邻情况</i></th>
+            <td><span id="plqk"></span></td>
+            <th align="right"><i>起火物</i></th>
+            <td><span id="qhwdm"></span></td>
+          </tr>
+          <tr>
+            <th align="right"><i>有无逃逸</i></th>
+            <td><span id="ywty"></span></td>
+            <th align="right"><i>危化车辆</i></th>
+            <td><span id="sfswhcl"></span></td>
+          </tr>
+        </table>
+       </div> 
+    </div>
+  </div>
+  </form>
+</div>
+<!--提交按钮-->
+<div class="submitButs"><a  id="saveButton" class="but-normal but-red"><i class="fa fa-save"></i> 派警</a> <a  id="cancelButton" class="but-normal but-greenlight"> <i class="fa fa-reply"></i> 返回</a></div>
+<!--内容部分end--> 
+

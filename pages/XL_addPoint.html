@@ -1,0 +1,130 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	//表单对象
+	var SubmitForm;
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		p.find(".formBox").height(p.WRAPER.height()-p.find(".submitButs").outerHeight(true));
+	}	
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);		
+	}
+	
+	this.READY=function(){
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+		//表单格式化处理
+		SubmitForm=new formDeal(p.find("#Form"));
+		$(SubmitForm).one("HTML_FORMATED",getFormData);//绑定格式化完成事件，执行下一步	
+		SubmitForm.parse();			
+		p.find("#actionPosition").bind("click",function(){
+			alert("地图采点")
+		})
+		//更新一下尺寸
+		p.resize();	
+	}		
+	
+	//编辑状态，获取数据
+	function getFormData(){ 
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){			
+			SubmitForm.bindData(backJson["value"]);//绑定数据		
+			p.find("#saveButton").bind("click",SaveForm);
+		})
+		Loader.POSTDATA("host/form.asp",{"event":"FormEdit","content":{"condition":p.CONDITION},"extend":{}});				
+		p.find("#cancelButton").bind("click",function(){ 
+			//返回展开列表---------------------------------------
+			WINDOW.reStore("window_702");
+			WINDOW.close(p.WINID);//关闭窗口			
+		});
+	}
+	
+	//提交保存
+	function SaveForm(){
+		//扩展数据校验例子，标准校验不需要
+		var addCheck=[
+				{"className":"addCheck",//识别标记 扩展校验.addCheck值的类型
+				"checkFun":function(val){//校验方法，返回true,false
+					if(val!="123456"){
+						return true;	
+					}
+					return false
+				},
+				"errorType":false, //错误标识
+				"error":"附加校验失败提示"} //校验错误提示
+			]; 
+		
+		if(SubmitForm.check(addCheck)){ //数据校验,addCheck--附加校验，没有可不填
+			//保存失败
+			var errorBack=function(e){				
+				p.find("#saveButton").removeClass("disable");//解按钮
+			}	
+			//保存成功
+			var saveResult=function(e,BackJson){
+				$.message("保存成功！",2000);
+				var parentWindow=WINDOW.getActionById(p.CONDITION["parentid"]);//通过窗体ID找到窗体对象（ACTION）
+				parentWindow.refesh(); //执行父窗体方法
+				WINDOW.close(p.WINID);//关闭窗口
+				//返回展开列表---------------------------------------
+				WINDOW.reStore("window_702");
+			}
+			//获取表单数据
+			formData=SubmitForm.getData();
+			p.find("#saveButton").addClass("disable");//锁按钮			
+			var postData={"event":"saveForm",
+									"extend":{"eventswitch":"save"},
+									"content":{"condition":p.CONDITION,"value":formData}
+									};		
+			var Loader=new AJAXObj();
+			$(Loader).unbind().one("JSON_LOADED",saveResult).one("SYS_ERROR",errorBack);			
+			Loader.POSTDATA("host/form.asp",postData);
+		}
+	}
+}
+</script>
+<!--内容部分start-->
+<!--表单-->
+<div class="formBox">
+<div class="pagetitle">新增任务点</div>
+  <form id="Form">
+    <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab">
+      <tr>
+        <th align="right" width="100"><i>点位名称</i></th>
+        <td><input name="name2"  type="text"  style="width:200px" /></td>
+      </tr>
+      <tr>
+        <th align="right"><i>巡逻时间</i></th>
+        <td><input style="width:200px"  class="fm_datepartinput"  value=""  data-option="{'data':'h,t','force2':true,'fast':false}"  name="starttime" type="text" title="不填为24小时有效"/>
+         </td>
+      </tr>
+      <tr>
+        <th align="right"><i>巡逻次数</i></th>
+        <td><input name="checklen"  type="text"  class="check_length check_uint"  style="width:200px" value="1" maxlength="5" minlength="1"/></td>
+      </tr>
+      <tr>
+        <th align="right"><i>点位坐标</i></th>
+        <td><input name="position"  type="text"  style="width:200px"  class="fm_actioninput"  readonly="readonly" maxlength="5" minlength="4" title="点击地图选择点位"/></td>
+      </tr>
+      <tr>
+        <th align="right"><em>状态</em></th>
+        <td><label><input  type="radio" name="radio" value="true" checked="checked" />有效</label> <label><input  type="radio" name="radio" value="false" />无效</label>
+          </td>
+      </tr>
+      <tr>
+        <th align="right"><em>备注</em></th>
+        <td><input  type="text" name="user"  style="width:200px" /></td>
+      </tr>
+    </table>
+  </form>
+</div>
+<!--提交按钮-->
+<div class="submitButs"><a  id="saveButton" class="but-normal but-red"><i class="fa fa-save"></i> 保存</a> 
+<a  id="cancelButton" class="but-normal but-yellow"> <i class="fa fa-reply"></i> 取消</a></div>
+<!--内容部分end-->

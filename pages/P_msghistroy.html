@@ -1,0 +1,227 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行READY方法，代替document.ready执行
+//重要：写在ACTION外的方法是全局方法，尽量不要这么干，以免方法冲突。
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//重要：页面关闭的时候会尝试执行DESTROY方法，请在这里解除事件绑定，销毁对象，以免窗体残留。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+//重要：保证标签完整闭合，否则IE8报错 “ACTION_Window_1426578029038953”未定义
+function ACTION(){
+	var p=this;	
+	var GroupList;
+	var LIST;
+	var PAGER;//分页对象
+	var nowGroupId;
+	var Mp3Player;   //音频播放对象
+	var Player;         //视频播放对象
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){ 
+		p.find(".scrollBox").setRealSize(null,p.WRAPER.height()-p.find(".msgSearchBox").outerHeight(true)-p.find(".msgPage").outerHeight(true));
+	}
+	
+	var SearchForm;	
+	
+	this.DESTROY=function(){
+		//清除播放器
+		if(Player){ 
+			Player.destroy();
+			Player=null;	
+		}
+		if(Mp3Player){
+			Mp3Player.destroy();
+			Mp3Player=null;	
+		}
+		if(GroupList){
+			GroupList.destroy();
+			GroupList=null;	
+		}
+		if(LIST){
+			LIST.destroy();
+			LIST=null;	
+		} 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);	
+		
+		//视频播放器
+		Player=new playFlvVideo(framePos+"frame/");//swf文件位置相对当前页的
+		
+		//表单处理
+		SearchForm=new formDeal(p.find("#msgsearch"));
+		SearchForm.parse();
+		
+		//消息		
+		//列表格式化例子------------------------------------------
+		var msgListFormater=function(msg){			
+			  //判断媒体文件
+			  var media=msg["type"]&&msg["type"]>1?true:false;
+			  var msr;
+			  if(media){
+				  if(msg["type"]==2){ //图片标记
+					  msr='<img src="'+msg["chat"]+'" />';
+				  }else if(msg["type"]==3){ //声音			
+					  msr='<a class="mediabut msg_sound" rel="'+msg["chat"]+'"><i class="fa fa-volume-up"/>'+(msg["size"]||'播放音频')+'</a>';
+				  }else if(msg["type"]==4){  //视频
+					  msr='<a class="mediabut msg_video" rel="'+msg["chat"]+'"><i class="fa fa-play"/>'+(msg["size"]||'播放视频')+'</a>';
+				  }else if(msg["type"]==5){  //文件
+					  msr='<a class="mediabut msg_file" href="'+msg["chat"]+'" target="_blank"><i class="fa fa-file"/>下载文件</a>';
+				  }
+			  }else{ //文字
+				  msr=msg["chat"]+"";
+			  }
+			  msg["chat"]=msr;		
+			  return msg;
+		}
+		
+		//格式化独立事件绑定------------------------------------
+		var msgActionFormater=function(RowObj){
+			RowObj.find("a.mediabut").bind("click",showMedia);
+			RowObj.find("img").ZoomBigPic();
+			return false;
+		}		
+		LIST=new ListView(p.find(".msgList ul"),p.find(".msgList .msgPage")); //列表容器，分页容器
+		
+		//组
+		var goption={
+			  "pageconfig":{
+						prev_show_always:true,
+						next_show_always:true,  
+						items_per_page:20, //每页条数
+						prev_text:"<"	, 
+						countText:false,//显示统计
+						num_display_entries:5, //分页断开时前面显示的数量
+						ellipse_text:"...", //分页断开时显示的分割符
+						num_edge_entries :0, //分页断开时后面显示的数量
+						next_text:">"							
+				  }
+		}
+							
+		GroupList=new ListView(p.find(".groupList ul"),p.find(".groupList .msgPage"),goption);
+		$(GroupList).unbind("LI_CLICKED").bind("LI_CLICKED",function(e,lidata){ 				
+			nowGroupId=lidata["data"]["groupid"];				
+			LIST.load("host/msghistory.asp",{"event":"getMsgList","content":{"condition":{"groupid":nowGroupId}},"extend":{}},msgListFormater,msgActionFormater); //获取数据
+		})
+		
+		//列表格式化例子------------------------------------------
+		var ListFormater=function(oneRow){ 
+			oneRow["lastmsg"]=oneRow["lastmsg"]?oneRow["lastmsg"]:"...";
+			oneRow["lastmsg"]=oneRow["jingqing"]?'[ <a rel="'+oneRow["jingqing"]+'" class="showJingqing red" title="'+oneRow["jingqing"]+'">警情 '+oneRow["jingqing"].substr(oneRow["jingqing"].length-4,oneRow["jingqing"].length)+'</a>  ]'+oneRow["lastmsg"]:"[ 普通会话 ] "+oneRow["lastmsg"];
+			return oneRow;
+		}
+		
+		//格式化独立事件绑定------------------------------------
+		var ActionFormater=function(RowObj){
+			//右键菜单
+			RowObj.RightPopMenu(function(){ 
+				return GroupRightMenu(RowObj.data("data"))
+			});
+			
+			RowObj.find("a.showJingqing").bind("click",function(){
+				var jingqing=$(this).attr("rel");
+				alert("打开警情："+jingqing)
+				return false;
+			}) 				
+		}	
+		//获取数据
+		GroupList.load("host/listgroup.asp",{"event":"getGroupList","content":{"condition":{}},"extend":{}},ListFormater,ActionFormater); //获取数据
+		//更新一下尺寸
+		p.resize();		
+	
+		//组查询
+		p.find(".groupList .msgSearchBox a").bind("click",groupSearch);
+		p.find(".groupList .msgSearchBox input[name=key]").enter(groupSearch);	//绑定回车提交		
+		//消息查询
+		p.find(".msgList .msgSearchBox a").bind("click",msgSearch);
+	}
+	
+	//显示媒体
+	function showMedia(){
+		var mediaurl=$(this).attr("rel"); 
+		if($(this).hasClass("msg_sound")){
+			//播放声音
+			if(Mp3Player){
+				Mp3Player.destroy();
+				Mp3Player=null;	
+			}
+			Mp3Player=new PlaySound(mediaurl,true,$(this));
+		}else if($(this).hasClass("msg_video")){
+			//播放视频						
+			Player.play(mediaurl,$(this));	
+		}else if($(this).hasClass("msg_file")){
+
+		}
+	}
+	
+	//组查询
+	function groupSearch(){ 
+		var key=p.find(".groupList .msgSearchBox input[name=key]").val();
+		key=trim(key);
+		if(key){
+			GroupList.reload({"event":"getGroupList","content":{"condition":{"key":key}},"extend":{}});
+		}			
+	}
+		
+	//消息查询
+	function msgSearch(){
+		if(!nowGroupId){
+			return;	
+		}		
+		if(SearchForm.check()){ //数据校验
+			var searchCondition=SearchForm.getData();//获取表单条件
+			$.extend(searchCondition,{"groupid":nowGroupId});//组合条件
+			LIST.reload({"event":"getMsgList","content":{"condition":searchCondition},"extend":{}});
+		}
+	}
+}
+</script>
+
+<!--内容部分start-->
+<!--群组容器-->
+<div class="historyWraper">
+  <div class="groupList">
+    <div class="msgSearchBox">
+      <label>
+        <input name="key" type="text" />
+      </label>
+    <a><i class="fa fa-search"></i></a><a><i class="fa fa-reply"></i></a></div>
+    <div class="scrollBox" dir="rtl">
+      <ul dir="ltr">
+        <li>
+          <h1 id="groupname"></h1>
+          <p id="lastmsg"></p>
+        </li>
+      </ul>
+    </div>
+    <div class="fm_pagination msgPage"></div>
+  </div>
+  
+  <!--消息容器-->
+  <div class="msgList">
+    <div class="msgSearchBox">
+      <form id="msgsearch">
+        <label>查询
+          <input name="key" type="text" />
+        </label>
+        <label>日期
+          <input name="serachDate" type="text"   class="fm_dateinput"  value=""  data-option="{'data':'y,m,d','force2':true}"/>
+        </label>
+        <a><i class="fa fa-search"></i></a>
+      </form>
+    </div>
+    <div class="scrollBox">
+      <ul>
+        <li>          
+          <h4><dd id="chattime"></dd><strong id="orgName"></strong><span id="userName"></span> : </h4>
+          <p id="chat"></p>
+        </li>
+      </ul>
+    </div>
+    <div class="fm_pagination msgPage"></div>
+  </div>
+</div>
+
+<!--内容部分end--> 

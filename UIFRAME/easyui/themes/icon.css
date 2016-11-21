@@ -1,0 +1,190 @@
+.icon-blank{
+	background:url('icons/blank.gif') no-repeat center center;
+}
+
+.icon-clumconfig{	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -44px -39px;
+}
+.icon-menu-bot {	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position:-12px -38px;
+}
+.icon-add{	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -45px -11px;
+}
+.icon-menu {	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -443px -11px;
+}
+
+.icon-window {	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -150px -11px;
+}
+.icon-export {	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -12px -11px;
+}
+.icon-import {	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -81px -11px;
+}
+.icon-edit{	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -114px -11px;
+}
+.icon-clear{	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -114px -38px;
+}
+.icon-remove{	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -318px -11px;
+}
+.icon-save{	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -512px -11px;
+}
+.icon-cut{	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -218px -11px;
+}
+.icon-print{	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -680px -11px;
+}
+.icon-ok{	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -545px -38px;
+}
+.icon-cancel{	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -476px -11px;
+}
+
+.icon-reload{	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -285px -11px;
+}
+
+.icon-search{	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -407px -11px;
+}
+
+.icon-alert{	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -613px -38px;
+}
+.icon-no{	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -580px -38px;
+}
+.icon-help{	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -647px -38px;
+}
+.icon-tip{	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -374px -11px;
+}
+
+.icon-back{	
+	background-position: -81px -38px;
+}
+
+.icon-undo{	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -318px -38px;
+}
+.icon-redo{	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -346px -38px;
+}
+
+.icon-sum{	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -374px -38px;
+}
+
+.icon-filter{	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -407px -38px;
+}
+.icon-man{	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -476px -38px;
+}
+.icon-lock{	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -443px -38px;
+}
+.icon-config{	
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -346px -11px;
+}
+.icon-panalreload{
+	background-image: url(icons/icons.png);
+	background-repeat: no-repeat;
+	background-position: -346px -11px;
+}
+
+
+.icon-mini-add{
+	background:url('icons/mini_add.png') no-repeat center center;
+}
+.icon-mini-edit{
+	background:url('icons/mini_edit.png') no-repeat center center;
+}
+.icon-mini-refresh{
+	background:url('icons/mini_refresh.png') no-repeat center center;
+}
+
+.icon-large-picture{
+	background:url('icons/large_picture.png') no-repeat center center;
+}
+.icon-large-clipart{
+	background:url('icons/large_clipart.png') no-repeat center center;
+}
+.icon-large-shapes{
+	background:url('icons/large_shapes.png') no-repeat center center;
+}
+.icon-large-smartart{
+	background:url('icons/large_smartart.png') no-repeat center center;
+}
+.icon-large-chart{
+	background:url('icons/large_chart.png') no-repeat center center;
+}
+
+
+

@@ -1,0 +1,567 @@
+<meta charset="utf-8">
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	var chirdName;
+	// 搜索条件
+	var SearchForm;
+
+	//窗口缩放尺寸设置
+	this.resize=function(){
+		p.find(".datalist").height(p.WRAPER.height()-p.find(".pageTopBox").outerHeight(true));		//option["height"]	
+		p.find("#tt").datagrid("resize"); 
+	}
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+		$(document).unbind("addEventDetailData",bindEventData);
+		var selectFeatureData = mainWindow.selectFeatureData;
+		if(selectFeatureData){
+			var oldFeature = selectFeatureData['marker'];
+			var geometry = oldFeature.geometry;
+			var latLon = new OpenLayers.LonLat(geometry.x, geometry.y);
+			var img = oldFeature.style.externalGraphic;
+			img = img.replace("images/zhdd/select_","images/zhdd/");
+			oldFeature.style.externalGraphic = img;
+			oldFeature.move(latLon);
+			mainWindow.selectFeatureData = "";
+		}
+		//WINDOW.getActionById("MapTools").hide();	
+	}
+	
+	this.READY=function(){
+		chirdName = p.WINID+'_dataGrid';
+		//WINDOW.getActionById("MapTools").show();
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",function(e,option){ 
+			p.resize();
+		})
+		
+		//表单处理
+		SearchForm=new formDeal(p.find("#searchForm"));
+		SearchForm.parse();
+		SearchForm.bindData(p.CONDITION);//绑定默认条件
+		
+		//表格例子------------------------------------------
+		var clumoption=[[
+			{field:'jqzk',width:"25px",sortable:true,formatter:function(value,record,index){
+					var result = "images/zhdd/ssyj/event_04.png";
+					if(value){
+						var arr = value.split(",");
+						var num = 0;
+						for(var i=0;i<arr.length;i++){
+							if(arr[i]!="4"){
+								num++;
+							}
+						}
+						if(num==3){
+							result = "images/zhdd/ssyj/event_01.png";
+						}else if(num==2){
+							result = "images/zhdd/ssyj/event_02.png";
+						}else if(num==1){
+							result = "images/zhdd/ssyj/event_03.png";
+						}
+					}
+					result = '<img src="'+result+'"/>';
+					return result;
+              }},
+			{field:'jqclzt',title:'状态',width:"60px",fixed:true,align:"center",sortable:true,formatter:function(value,record,index){
+					var result = util.getJqclzt(value);
+					if(value=="2"){
+						result = '<span style="color:#ff0000;font-weight:bold;">'+result+'</span>';
+					}else if(value=="3"){
+						result = '<span style="color:#ff8e28;font-weight:bold;">'+result+'</span>';
+					}else if(value=="4"){
+						result = '<span style="color:#29c000;font-weight:bold;">'+result+'</span>';
+					}
+					/*
+					if(record.jqdjdm == "重大"){
+						result = '<span style="color:#ef0000;font-weight:bold;">'+result+'</span>';
+					}else if(record.jqdjdm == "严重"){
+						result = '<span style="color:#ff7200;font-weight:bold;">'+result+'</span>';
+					}
+					*/
+					return result;
+	               	
+              },sorter:function(a,b){  
+					a = a.split('/');  
+					b = b.split('/');  
+					if (a[2] == b[2]){  
+						if (a[0] == b[0]){  
+							return (a[1]>b[1]?1:-1);  
+						} else {  
+							return (a[0]>b[0]?1:-1);  
+						}  
+					} else {  
+						return (a[2]>b[2]?1:-1);  
+					}  
+			}},
+			{field:'jjrbh',title:'席位号',width:"60px",sortable:true,align:"right",formatter:function(value,record,index){
+					var result = value;
+					//if(record.jqclzt=="1"&&record.sfyj=="1"){
+					//	result = '<span class="alertflash hotpoint"></span>'+value;
+					//}
+					var flag = false;
+					var jqzk = record.jqzk;
+					if(jqzk){
+						var arr = jqzk.split(",");
+						for(var i=0;i<arr.length;i++){
+							if(arr[i]=="4"){
+								flag = true;
+							}
+						}
+					}
+					if(flag){
+						if(record.jqclzt=="1"&&record.sfyj=="1"){
+								result = '<span class="alertflash hotpoint" style="width:22px;height:22px;border-radius:30px"></span>'+'<span style="color:#ff0000;font-weight:bold;">'+value+'</span>';
+						}else{
+							result = '<span style="color:#ff0000;font-weight:bold;">'+value+'</span>';
+						}
+					}else{
+						if(record.jqclzt=="1"&&record.sfyj=="1"){
+							result = '<span class="alertflash hotpoint"></span>'+value;
+						}
+					}
+					return result;
+	               	
+              },sorter:function(a,b){  
+					a = a.split('/');  
+					b = b.split('/');  
+					if (a[2] == b[2]){  
+						if (a[0] == b[0]){  
+							return (a[1]>b[1]?1:-1);  
+						} else {  
+							return (a[0]>b[0]?1:-1);  
+						}  
+					} else {  
+						return (a[2]>b[2]?1:-1);  
+					}  
+			}},
+			{field:'jqlxdm',title:'类型',width:"12%",align:"center",formatter:function(value,record,index){
+	               var result = util.getAjlx(value);
+	               /*
+	               	if(record.jqdjdm == "重大"){
+						result = '<span style="color:#ef0000;font-weight:bold;">'+result+'</span>';
+					}else if(record.jqdjdm == "严重"){
+						result = '<span style="color:#ff7200;font-weight:bold;">'+result+'</span>';
+					}
+					*/
+					var flag = false;
+					var jqzk = record.jqzk;
+					if(jqzk){
+						var arr = jqzk.split(",");
+						for(var i=0;i<arr.length;i++){
+							if(arr[i]=="4"){
+								flag = true;
+							}
+						}
+					}
+					if(flag){
+						result = '<span style="color:#ff0000;font-weight:bold;">'+result+'</span>';
+					}
+					return result;
+              }},
+			{field:'bjnr',title:'警情内容',width:"25%",formatter:function(value,record,index){
+					var result = value;
+					var flag = false;
+					var jqzk = record.jqzk;
+					if(jqzk){
+						var arr = jqzk.split(",");
+						for(var i=0;i<arr.length;i++){
+							if(arr[i]=="4"){
+								flag = true;
+							}
+						}
+					}
+					if(flag){
+						result = '<span style="color:#ff0000;font-weight:bold;">'+result+'</span>';
+					}
+					return result;
+              }},
+			{field:'jqdd',title:'地址',width:"27%",formatter:function(value,record,index){
+					var result = value;
+					var flag = false;
+					var jqzk = record.jqzk;
+					if(jqzk){
+						var arr = jqzk.split(",");
+						for(var i=0;i<arr.length;i++){
+							if(arr[i]=="4"){
+								flag = true;
+							}
+						}
+					}
+					if(flag){
+						result = '<span style="color:#ff0000;font-weight:bold;">'+result+'</span>';
+					}
+					return result;
+              }},
+			{field:'bjsj',title:'报警时间',width:"140px",sortable:true,align:"center",formatter:function(value,record,index){
+					var result = value;
+					var flag = false;
+					var jqzk = record.jqzk;
+					if(jqzk){
+						var arr = jqzk.split(",");
+						for(var i=0;i<arr.length;i++){
+							if(arr[i]=="4"){
+								flag = true;
+							}
+						}
+					}
+					if(flag){
+						result = '<span style="color:#ff0000;font-weight:bold;">'+result+'</span>';
+					}
+					return result;
+              },sorter:function(a,b){  
+					a = a.split('/');  
+					b = b.split('/');  
+					if (a[2] == b[2]){  
+						if (a[0] == b[0]){  
+							return (a[1]>b[1]?1:-1);  
+						} else {  
+							return (a[0]>b[0]?1:-1);  
+						}  
+					} else {  
+						return (a[2]>b[2]?1:-1);  
+					}  
+			}},
+			{field:'bjdh',title:'报警电话',width:"18%",align:"center",formatter:function(value,record,index){
+					var result = value;
+					var flag = false;
+					var jqzk = record.jqzk;
+					if(jqzk){
+						var arr = jqzk.split(",");
+						for(var i=0;i<arr.length;i++){
+							if(arr[i]=="4"){
+								flag = true;
+							}
+						}
+					}
+					if(flag){
+						result = '<span style="color:#ff0000;font-weight:bold;">'+result+'</span>';
+					}
+					return result;
+              }},
+			]];
+		p.find("#tt").datagrid({
+			fit:true,
+			showFooter:true,//显示总计??
+			rownumbers:false,//行号
+			singleSelect:true,
+			fitColumns:true,//宽度自适应
+			striped:true,//条纹
+			//pagination:true,//分页
+			//pageSize:100,
+			//pageList:[100],
+			remoteSort:false,
+			columns:clumoption,
+			//渲染行样式
+			onDblClickRow:onDblClickRow,
+			onRowContextMenu:rightClickShowMsg,
+			onClickRow:onClickRow
+			//,
+			//loadFilter:pagerFilter
+		})
+		//渲染单元格
+		formatter(mainWindow.eventStore);
+		$(document).unbind("addEventDetailData",bindEventData);
+		$(document).bind("addEventDetailData",bindEventData)
+		p.find("#searchButton").bind("click",SearchButtonClick);
+		p.find("#resetButton").bind("click",ResetButtonClick);
+		//更新一下尺寸
+		p.resize();
+		
+	}
+	
+	function SearchButtonClick(){
+		var formData=SearchForm.getData();
+		$(document).unbind("addEventDetailData",bindEventData);
+		p.find("#resetButton").unbind("click",ResetButtonClick);
+		p.find("#searchButton").unbind("click",SearchButtonClick);
+		mainWindow.loadEventData(true,formData['orgCode'],formData['jqclzt'],formData['jjrbh'],function(){
+			p.find("#tt").datagrid("loadData",mainWindow.eventStore);
+			p.find("#tt").datagrid("loadData",mainWindow.eventStore);
+			$(document).bind("addEventDetailData",bindEventData);
+			p.find("#resetButton").bind("click",ResetButtonClick);
+			p.find("#searchButton").bind("click",SearchButtonClick);
+		});
+		
+	}
+	
+	function ResetButtonClick(){
+		//清空状态和部门的值
+		p.find("[name=jqclzt]").changeValue("");
+		p.find("#orgCode").val("");
+		p.find("#orgCode_text").val("");
+		p.find("[name=jjrbh]").val("");
+		//重新调用一次search按钮
+		SearchButtonClick();		
+	}
+	
+	function bindEventData(e,recordData){
+		
+		if(p.find("#tt").length==0){
+			$(document).unbind("addEventDetailData",bindEventData);
+			return;
+		}
+		var dataRows = p.find("#tt").datagrid("getData")['rows'];
+		if(recordData['jqclzt']=="5"||recordData['jqzt']=="2"){
+			//alert(recordData['jqid']+";length:"+dataRows.length);
+			for (var i=0;i<dataRows.length;i++) {
+				//alert(recordData['jqid']+"........."+dataRows[i]['jqid']);
+				if(recordData['jqid'] == dataRows[i]['jqid']){
+					p.find("#tt").datagrid("deleteRow",i);
+					break;
+				}
+			}
+		}else if(recordData['jqclzt']=="1"){
+			for (var i=0;i<dataRows.length;i++) {
+				if(recordData['jqid'] == dataRows[i]['jqid']){
+					p.find("#tt").datagrid("deleteRow",i);
+					break;
+				}
+			}
+			if(recordData['sfyj']=="1"){
+				p.find("#tt").datagrid("insertRow",{index:0,row:recordData});
+			}else{
+				p.find("#tt").datagrid("appendRow",recordData);
+			}
+		}else{
+			for (var i=0;i<dataRows.length;i++) {
+				if(recordData['jqid'] == dataRows[i]['jqid']){
+					p.find("#tt").datagrid("updateRow",{index: i,row: recordData});
+					break;
+				}
+			}
+		}
+		
+		//mainWindow.bindEventData(p,recordData);
+		/*
+		var dataRows = p.find("#tt").datagrid("getData")['rows'];
+		var dataArr = p.find("#tt").datagrid("getChecked");
+		var store = mainWindow.eventStore;
+		var isDelete = false;
+		if(dataArr.length>0){
+			var data = dataArr[0];
+			formatter(store);
+			for(var i=0;i<store.length;i++){
+				if(data['jqid']== store[i]['jqid']){
+					//var obj = $.extend({},store[i]);
+					//store.splice(i,1);
+					//store.unshift(obj);
+					p.find("#tt").datagrid("checkRow",i);
+					isDelete = true;
+					break;
+				}
+			}
+			//if(isDelete){
+			//	p.find("#tt").datagrid("checkRow",0);
+				//onClickRow(0,store[0]);
+			//}
+		}else{
+			formatter(store);
+		}
+		*/
+		//addEventData(store);
+	}
+		
+	function formatter(arr){
+		var store = arr;
+		try{
+			p.find("#tt").datagrid("loadData",store)
+		}catch(e){
+			$(document).unbind("addEventDetailData",bindEventData);
+		}
+	}
+	
+	/*
+	function addEventData(obj){
+		formatter(obj);
+	}
+	*/
+	function onDblClickRow(rowIndex, rowData){
+		WINDOW.close(chirdName);
+		var tr = $.getDatagridTr(p.find("#tt"),rowIndex); 
+		WINDOW.open({"name":chirdName,"width":800,"height":400,"url":"pages/zhdd/eventViewLBC.html","title":"警情详细",'position':'left_bottom'},{"record":rowData},tr);
+		/*
+		if(rowData['jqclzt']=="1"){
+			WINDOW.open({"name":chirdName,"width":800,"height":400,"url":"pages/zhdd/eventView.html","title":"警情详细",'position':'left_bottom'},{"record":rowData},tr);
+		}else{
+			WINDOW.open({"name":chirdName,"width":600,"height":400,"url":"pages/zhdd/eventProcessDetail.html","title":"警情详细",'position':'left_bottom'},{"record":rowData},tr);
+		}
+		*/
+	}
+	
+	function onClickRow(rowIndex, rowData){
+		//alert(rowData['markerddd']);
+		var mapObj = mainWindow.mapObj;
+		var jqclzt = rowData['jqclzt'];
+		var point = null;
+		if(jqclzt=="2"||jqclzt=="3"){
+			var mhzb = rowData['mhjqzb'];
+			point = OpenLayers.Geometry.fromWKT(mhzb);
+		}else if(jqclzt=="4"){
+			var jqzb = rowData['jqjqzb'];
+			point = OpenLayers.Geometry.fromWKT(jqzb);
+		}
+		
+		if(mapObj&&point){
+			point = new OpenLayers.LonLat(point.x, point.y); 
+			mapObj.setCenter(point);
+		}
+		
+		//地图选择时图标切换
+		var selectFeatureData = mainWindow.selectFeatureData;
+		if(selectFeatureData){
+			var oldFeature = selectFeatureData['marker'];
+			var geometry = oldFeature.geometry;
+			var latLon = new OpenLayers.LonLat(geometry.x, geometry.y);
+			var img = oldFeature.style.externalGraphic;
+			img = img.replace("images/zhdd/select_","images/zhdd/");
+			oldFeature.style.externalGraphic = img;
+			oldFeature.move(latLon);
+			mainWindow.selectFeatureData = "";
+		}
+		var feature = rowData['marker'];
+		if(feature&&rowData['jqclzt']!="1"){
+			mainWindow.selectFeatureData = rowData;
+			var img = feature.style.externalGraphic;
+			var geometry = feature.geometry;
+			var latLon = new OpenLayers.LonLat(geometry.x, geometry.y);
+			img = img.replace("images/zhdd/","images/zhdd/select_");
+			feature.style.externalGraphic = img;
+			feature.move(point);
+		}
+		
+	}
+	
+	function rightClickShowMsg(e,rowIndex,row){
+		e.preventDefault();
+		var jqclzt= row['jqclzt'];
+		var tr = $.getDatagridTr(p.find("#tt"),rowIndex); 
+		if(jqclzt!="1"){
+			var pos=[e.clientX,e.clientY]; 
+			var msg=$("<p><a id='bczlBtn' class='but-small but-red' style='width:60px'>补充指令</a></p><p> <a id='cxpjBtn' class='but-small but-green' style='width:60px'>重新派警</a></p><p> <a id='jqcxBtn' class='but-small but-yellow' style='width:60px'>警情撤销</a></p><p> <a id='cjzBtn' class='but-small but-yellow' style='width:60px'>创建组</a></p>");
+			$.tips(pos,"right",msg,[80,110]);
+		}else{
+			var pos=[e.clientX,e.clientY]; 
+			var msg=$("<p> <a id='jqcxBtn' class='but-small but-yellow' style='width:60px'>警情撤销</a></p><p> <a id='cjzBtn' class='but-small but-yellow' style='width:60px'>创建组</a></p>");
+			$.tips(pos,"right",msg,[80,55]);
+		}
+		msg.find("#bczlBtn").one("click",function(){
+				WINDOW.close(chirdName);
+				var params = {"value":"","text":""};
+				WINDOW.open({"name":chirdName,"width":520,"height":400,"mulit":false,"url":"pages/zhdd/commandTreeSelector.html","title":"补充指令",'position':'left_center','locksize':true},{"record":row,"values":params},tr);
+				$.closetips();//关闭tip消息
+			});
+		msg.find("#cxpjBtn").one("click",function(){
+			WINDOW.close(chirdName);
+			WINDOW.open({"name":chirdName,"width":800,"height":400,"url":"pages/zhdd/eventView.html","title":"警情详细",'position':'left_bottom'},{"record":row},tr);		
+			$.closetips();//关闭tip消息
+		});
+		msg.find("#jqcxBtn").one("click",function(){
+			updateEventInvalid(row);
+			$.closetips();//关闭tip消息
+		});
+                msg.find("#cjzBtn").one("click",function(){
+                        WINDOW.close("window_006");
+			WINDOW.open({"name":"window_006","width":600,"height":600,"url":"pages/zhdd/zhddIM.html","title":"合成作战","position":"left_top","toggle":false},{"record":row},tr);
+			$.closetips();//关闭tip消息
+		});
+	}
+	
+	//撤销警情
+	function updateEventInvalid(row){
+		var postData={
+				"event":"STATION",
+				"extend":{"eventswitch":"load"},
+				"content":{"condition":{"jqid":row['jqid']}}
+			};
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){	
+			var result = backJson['value'];
+			if(result){
+				$.message("撤销成功!");
+			}else{
+				$.message("操作失败!");
+			}
+		});
+		Loader.POSTDATA("php/event/UpdateEventInvalidById_web.php",postData);
+	}
+	
+	function pagerFilter(data){
+			if (typeof data.length == 'number' && typeof data.splice == 'function'){	// is array
+				data = {
+					total: data.length,
+					rows: data
+				}
+			}
+			var dg = $(this);
+			var opts = dg.datagrid('options');
+			var pager = dg.datagrid('getPager');
+			pager.pagination({
+				onSelectPage:function(pageNum, pageSize){
+					opts.pageNumber = pageNum;
+					opts.pageSize = pageSize;
+					pager.pagination('refresh',{
+						pageNumber:pageNum,
+						pageSize:pageSize
+					});
+					dg.datagrid('loadData',data);
+				}
+			});
+			if (!data.originalRows){
+				data.originalRows = (data.rows);
+			}
+			var start = (opts.pageNumber-1)*parseInt(opts.pageSize);
+			var end = start + parseInt(opts.pageSize);
+			data.rows = (data.originalRows.slice(start, end));
+			return data;
+	}
+	
+	
+}
+</script>
+<div class="pageTopBox">
+  <!--查询-->
+  <div class="searchBox">
+    <form id="searchForm">
+      <table border="0" cellspacing="0" cellpadding="3" >
+        <tr>
+          <td colspan="2"><ul>
+              <li> <i>状态:</i>
+                <select  style="width:160px" name="jqclzt" id="jqclzt">
+                  <option value="">全部</option>
+                  <option value="1">未派警</option>
+                  <option value="2">已派警</option>
+                  <option value="3">已接收</option>
+                  <option value="4">处理中</option>
+                </select>
+              </li>
+              <li> <i>部门:</i>
+              	<input  type="text" name="orgCode" id="orgCode"  style="width:160px" class="fm_popOutSelect" data-option="{'url':'pages/treeSelector_bm.html','width':520,'height':400,'mulit':true,'locksize':true}" /> 
+              </li>
+              <li> <i>席位号:</i>
+                  <input  type="text" name="jjrbh" style="width:100px" id="jjrbh"/>
+              </li>
+            </ul>
+            <div class="cl"></div></td>
+            <td  width="100"  align="right" valign="top" ><a  id="searchButton" class="but-small but-red"><i class="fa fa-search"></i> 查询</a></td>
+            <td   valign="top"><a  id="resetButton" class="but-small but-blue"><i class="fa fa-reset"></i> 重置</a></td>
+        </tr>
+      </table>
+    </form>
+  </div>
+</div>
+<!--内容部分start-->
+<!--表格-->
+<div class="datalist">
+  <div id="tt"> </div>
+</div>
+
+
+<!--内容部分end-->
+

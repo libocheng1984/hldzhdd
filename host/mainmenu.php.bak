@@ -1,0 +1,22 @@
+{
+      "head":{"code":1,"message":""},      
+      "value":[
+      		{"title":"接处警","menu":[
+            		{"name":"window_001","width":670,"height":270,"url":"pages/zhdd/zhdd.html","title":"指挥调度","position":"left_top","toggle":true},
+            		{"name":"window_002","width":750,"height":270,"url":"pages/zhdd/overEvent.html","title":"结束警情","position":"left_top"}
+            ],"iconclass":"icon0"},
+            {"title":"勤务管理","menu":[
+            		{"name":"window_003","width":600,"height":270,"url":"pages/equip/policeGroup.html","title":"巡逻组查询","position":"left_bottom"},
+            		{"name":"window_004","width":600,"height":270,"url":"pages/equip/xltzbcx.html","title":"巡逻特征查询","position":"left_bottom"},
+            		{"name":"window_005","width":600,"height":270,"url":"pages/equip/xkzhcx.html","title":"巡逻绑定","position":"left_bottom"},
+            		{"name":"window_009","width":1200,"height":470,"url":"pages/zhdd/zbbd.html","title":"装备绑定","side":"right"}
+            ],"iconclass":"icon1"},
+            {"title":"合成作战","menu":[
+            		{"name":"window_006","width":460,"height":600,"url":"pages/zhdd/zhddIM.html","title":"合成作战","position":"left_top","toggle":true}
+             ],"iconclass":"icon2"},		
+            {"title":"预案管理","iconclass":"icon2"},
+            {"title":"决策分析","iconclass":"icon2"},
+            {"title":"系统维护","iconclass":"icon2"}
+      ],
+        "extend":{}
+}	

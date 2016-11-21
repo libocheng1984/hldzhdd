@@ -1,0 +1,109 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行READY方法，代替document.ready执行
+//重要：写在ACTION外的方法是全局方法，尽量不要这么干，以免方法冲突。
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//重要：页面关闭的时候会尝试执行DESTROY方法，请在这里解除事件绑定，销毁对象，以免窗体残留。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+//重要：保证标签完整闭合，否则IE8报错 “ACTION_Window_1426578029038953”未定义
+function ACTION(){
+	var p=this;	
+	var SearchForm;//定义查询表单
+         var queryParams;
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){  
+		p.find(".datalist").height(p.WRAPER.height()-p.find(".pageTopBox").outerHeight(true));   
+		p.find("#tt").datagrid("resize"); 
+	}	
+	
+	//卸载时销毁方法
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	//加载后执行
+	this.READY=function(){
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+                queryParams = {"rwid":p.CONDITION.rwid,"tbid":p.CONDITION.bdid,"userid":p.CONDITION.userid,"zhdksj":p.CONDITION.xlrq};
+		//alert(JSON.stringify(queryParams));		
+		
+		//表格例子------------------------------------------EasyUI组件
+		var clumoption=[[
+			
+			{field:'kdmc',title:'点位名称',width:"20%",align:"center"},
+			{field:'ydcs',title:'应打卡次数',width:"15%",align:"center"},
+			{field:'dkcs',title:'成功打卡次数',width:"15%",align:"center"},
+            {field:'wshdkcs',title:'待审核打卡次数',width:"15%",align:"center"},
+			{field:'dksd',title:'有效打卡时间',width:"15%",align:"center"},
+			{field:'zhdksj',title:'最后打卡时间',width:"19%",align:'center',formatter: function(value,row,index){
+				if (value&&value.length>10){
+					return value.substring(0,19);
+				}
+                                else
+                                    return "";
+			}}
+			]];
+					
+		p.find("#tt").datagrid({
+			url:"php/rwkhcx/getZDTDutyTaskPointNew.php",
+			queryParams:queryParams, //附加参数对象
+			loadFilter:formatHostJson,  //格式过滤器
+			fit:true,
+			showFooter:true,//显示总计
+			rownumbers:true,//行号
+			singleSelect:true,//单选
+			fitColumns:true,//宽度自适应
+			striped:true,//条纹
+			pagination:true,//分页
+			onDblClickRow:dataGridClick,
+			columns:clumoption
+		}).datagrid('getPager').pagination({  //设置显示列切换按钮
+				buttons:[{
+					iconCls:'icon-clumconfig',
+					handler:function(e){ClumChocie(p.find('#tt'),$(this),e)}
+				}]
+		})	
+			
+		
+		//更新一下尺寸
+		p.resize();
+	}
+	
+	//datagrid行点击
+	function dataGridClick(rowIndex,rowData){   
+		//p.find("#tt").datagrid("");
+		//触发滑动到下一页事件
+                 $.extend(rowData,queryParams);
+		$(p.WINDOW).trigger("GOTO_PAGE",{"condition":$.extend({},rowData,{"winid":p.WINID})});
+	}
+	
+	//查询
+	function StartSearch(){
+		if(SearchForm.check()){ //数据校验
+			var searchCondition=SearchForm.getData();//获取表单条件
+			//刷新DataGrid
+                        $.extend(queryParams,searchCondition);
+			p.find("#tt").datagrid("reload",queryParams);
+		}
+	}
+        this.refesh= function(){
+            //alert(123);
+            p.find("#tt").datagrid("reload");
+        }
+}
+</script>
+
+<!--内容部分start-->
+<div class="pageTopBox"> 
+  <!--查询-->
+  <div class="searchBox">
+    
+  </div>
+</div>
+<!--表格-->
+<div class="datalist">
+  <div id="tt"> </div>
+</div>
+<!--内容部分end--> 

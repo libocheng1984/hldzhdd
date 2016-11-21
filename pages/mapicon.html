@@ -1,0 +1,246 @@
+<script type="text/javascript">
+function ACTION(){
+	var p=this;
+	var totalGroup = 0;
+	var isGo = false;
+	this.READY=function(){
+		p.find("#eventId").bind("click",openAwindow);
+		p.find("#leaderEventId").bind("click",openLeaderAwindow);
+		
+		$(document).unbind("addEventData",setEventLength);
+		$(document).bind("addEventData",setEventLength);
+		$(document).unbind("addEventDetailData",bindEventData);
+		$(document).bind("addEventDetailData",bindEventData);
+		
+		$(WEBCHAT).unbind("CHAT_NEW_MSG").bind("CHAT_NEW_MSG",showNewMsg);//添加用户事件监听
+		p.find("p#msgnum").unbind().bind("click",showChatWindow);
+		if(userData){
+			getGroupCount();
+		}else{
+			$(document).unbind("addUserInfoData");
+			$(document).one("addUserInfoData",function(e,data){
+				getGroupCount();
+			});
+		}
+		
+		getRoleMenu();
+		
+	}
+	function setCookie(name,value)
+	{
+	var Days = 30;
+	var exp = new Date();
+	exp.setTime(exp.getTime() + Days*24*60*60*1000);
+	document.cookie = name + "="+ escape (value) + ";expires=" + exp.toGMTString();
+	}
+	
+	//查询总警力数
+	function getRoleMenu(){
+		var postData={
+				"event":"STATION",
+				"extend":{"groupswitch":"load"},
+				"content":{}
+			};
+		var Loader=new AJAXObj();
+		//Loader.isasync=false
+		$(Loader).bind("JSON_LOADED",function(e,backJson){	
+			var result = backJson['value'];
+			for(var i=0;i<result.length;i++){
+				if(result[i]['title']=="警情"){
+					p.find("#eventId").show();
+				}else if(result[i]['title']=="关注"){
+					p.find("#leaderEventId").show();
+				}else if(result[i]['title']=="警力"){
+					p.find("#groupId").show();
+				}else if(result[i]['title']=="消息"){
+					p.find("#msgnum").show();
+				}
+				else
+				{
+					
+				}
+				if(result[i]['setcookie']!="")
+				{
+					setCookie(result[i]['setcookie'],result[i]['setcookie']);
+				}
+			}
+		});
+		Loader.POSTDATA("php/system/GetRoleMenu_web.php",postData);
+	}
+	
+	function showChatWindow(){
+		WEBCHAT.showChat();
+		$(this).find("i").removeClass("alertflash");
+		$(this).find("strong").text("0");
+	}
+	
+	//显示最新消息数
+	function showNewMsg(e,msgvar){ 
+		var box=p.find("p#msgnum");
+		var num=box.find("strong").text()||"0";
+		num=(num=="···")?100:parseInt(num); 
+		//alert(parseInt(msgvar["num"])+"--"+num);
+		num+=parseInt(msgvar["num"]);
+		num=num>99?"···":num;
+		if(num>0){
+			box.find("i").addClass("alertflash");
+		}else{
+			box.find("i").removeClass("alertflash");
+		}
+		box.find("strong").text(""+num);
+	}
+	
+	this.DESTROY=function(){ 
+		p.find("p").unbind();
+		$(document).unbind("addEventData",setEventLength);
+		$(document).unbind("addPoliceGroupData",setGroupLength);
+		$(document).unbind("addEventDetailData",bindEventData);
+	}
+	
+	function bindEventData(e,recordData){
+		var falg = false;
+		var value = recordData['jqzk'];
+		var sfqr = recordData['sfqr'];
+		if(value){
+			var arr = value.split(",");
+			for(var i=0;i<arr.length;i++){
+				if(arr[i]=="4"&&sfqr!="1"){
+					falg = true;
+				}
+			}
+		}
+		if(!falg){
+			return;
+		}
+		
+		if(recordData['jqclzt']=="5"||recordData['jqzt']=="2"){
+			var store = mainWindow.eventStore;
+			var record = new Array();
+			for(var i=0;i<store.length;i++){
+				var value = store[i]['jqzk'];
+				if(value){
+					var jqzkArr = value.split(",");
+					for(var j=0;j<jqzkArr.length;j++){
+						if(jqzkArr[j]=="4"){
+							record.push(store[i]);
+						}
+					}
+				}
+			}
+			var action = WINDOW.getActionById("MapTools");
+			if(record.length==0){
+				action.stopSound();
+			}
+		}else if(recordData['jqclzt']=="2"){
+			var action = WINDOW.getActionById("MapTools");
+			action.playSound();
+		}
+		
+	}
+	
+	function playSound(){
+		if(!isGo){
+			var record = new Array();
+			var store = mainWindow.eventStore;
+			for(var i=0;i<store.length;i++){
+				var value = store[i]['jqzk'];
+				if(value){
+					var jqzkArr = value.split(",");
+					for(var j=0;j<jqzkArr.length;j++){
+						if(jqzkArr[j]=="4"){
+							record.push(store[i]);
+						}
+					}
+				}
+			}
+			var action = WINDOW.getActionById("MapTools");
+			if(record.length>0){
+				action.playSound();
+			}else{
+				action.stopSound();
+			}
+			isGo = true;
+		}
+		
+	}
+	
+	//查询总警力数
+	function getGroupCount(){
+		var postData={
+				"event":"STATION",
+				"extend":{"groupswitch":"load"},
+				"content":{"condition":{"orgCode":userData.orgCode,"userId":""}}
+			};
+		var Loader=new AJAXObj();
+		//Loader.isasync=false
+		$(Loader).bind("JSON_LOADED",function(e,backJson){	
+			var result = backJson['value'];
+			if(result>=0){
+				totalGroup = result;
+				$(document).unbind("addPoliceGroupData",setGroupLength);
+				$(document).bind("addPoliceGroupData",setGroupLength);
+			}
+		});
+		Loader.POSTDATA("php/equip/GetGroudCount_web.php",postData);
+	}
+	
+	function setEventLength(e,obj){
+		p.find("#eventCount").text(obj.eventStore.length);
+		var record = new Array();
+		var qrCount = 0;
+		for(var i=0;i<obj.eventStore.length;i++){
+			var value = obj.eventStore[i]['jqzk'];
+			var sfqr = obj.eventStore[i]['sfqr'];
+			if(value){
+				var jqzkArr = value.split(",");
+				for(var j=0;j<jqzkArr.length;j++){
+					if(jqzkArr[j]=="4"){
+						record.push(obj.eventStore[i]);
+					}
+					if(jqzkArr[j]=="4"&&sfqr=="1"){
+						qrCount++;
+					}
+				}
+			}
+		}
+		var syqr = record.length-qrCount;
+		
+	   p.find("#leaderEventCount").text(record.length);
+	   
+	   if(syqr==0){
+			var action = WINDOW.getActionById("MapTools");
+			action.stopSound();
+		}else{
+			playSound();
+		}
+	}
+	
+	
+	function setGroupLength(e,obj){
+		var onlineCount = 0;
+		for(var i=0;i<obj.stationGroupStore.length;i++){
+			var value = obj.stationGroupStore[i]['isOnLine'];
+			if(value=="1"){
+				onlineCount++;
+			}
+		}
+	   p.find("#groupCount").text(totalGroup+"/"+onlineCount);
+	}
+	
+	function openAwindow(){
+		var option={'name':'window_001','width':670,'height':270,'url':'pages/zhdd/zhdd.html','title':'指挥调度中心','position':'left_top'};
+		WINDOW.open(option,null,$(this));
+	}
+	
+	function openLeaderAwindow(){
+		var option={'name':'window_leader','width':670,'height':270,'url':'pages/zhdd/leaderZhdd.html','title':'领导关注','position':'center_top'};
+		WINDOW.open(option,null,$(this));
+	}
+}
+</script>
+<!-- <p><i class="fa fa-cab"></i> <span>车辆：</span> 125</p>  -->
+<!-- <p><i class="fa fa-user"></i> <span>警员：</span> 65</p>  -->
+<p id="eventId" style="display: none;"><i class="fa fa-warning alertflash"></i> <span>警情：</span><lable id="eventCount"> 0</lable></p>
+<p id="leaderEventId" style="display: none;"><i class="fa fa-exclamation-circle alertflash"></i> <span>关注：</span><lable id="leaderEventCount"> 0</lable></p>
+<p id="groupId" style="display: none;"><i class="fa fa-user"></i> <span>警力：</span><lable id="groupCount"> 0/0</lable></p>
+<p id="msgnum" style="display: none;"><i class="fa fa-comment alertflash"></i> <span>消息：</span> <strong>0</strong></p>

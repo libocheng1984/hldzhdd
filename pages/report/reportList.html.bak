@@ -1,0 +1,110 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行READY方法，代替document.ready执行
+//重要：写在ACTION外的方法是全局方法，尽量不要这么干，以免方法冲突。
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//重要：页面关闭的时候会尝试执行DESTROY方法，请在这里解除事件绑定，销毁对象，以免窗体残留。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+//重要：保证标签完整闭合，否则IE8报错 “ACTION_Window_1426578029038953”未定义
+function ACTION(){
+	var p=this;	
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){ 
+		p.find(".datalist").height(p.WRAPER.height()); 
+		p.find("#tt").datagrid("resize"); 
+	}
+	
+	var SearchForm;	
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+		
+		//表单处理
+		SearchForm=new formDeal(p.find("#searchForm"));
+		SearchForm.parse();
+		SearchForm.bindData(p.CONDITION);//绑定默认条件		
+		
+		//表格例子------------------------------------------EasyUI组件
+		var clumoption=[[
+			
+			{field:'reportName',title:'警情报表',width:"100%",resizable:false,align:"center"}
+			]];
+		p.find("#tt").datagrid({
+			url:"host/Statisticalreport.php",
+			queryParams:{"guid":"asjdhasjd3434343"}, //附加参数对象
+			loadFilter:formatHostJson,  //格式过滤器
+			fit:true,
+			showFooter:true,//显示总计
+			rownumbers:true,//行号
+			//singleSelect:false,//单选
+			fitColumns:true,//宽度自适应
+			striped:true,//条纹
+			//pagination:true,//分页
+			onDblClickRow:dataGridClick,
+/*			onClickRow:function(){
+				console.log("行点击");	
+			},*/
+			columns:clumoption
+		}).datagrid('getPager').pagination({  //设置显示列切换按钮
+				//buttons:$('#buttons');//插入html
+				buttons:[{
+					iconCls:'icon-clumconfig',
+					handler:function(){ClumChocie(p.find('#tt'),$(this))}
+				}]
+		})
+		
+		//更新一下尺寸
+		p.resize();
+		
+		//安装按钮点击事件
+		p.find(".actionBox a").menuButton({"guid":"123456789","parentid":p.WINID});		
+		//绑定查询按钮点击
+		p.find("#searchButton").bind("click",StartSearch);		
+		
+		//刷新弹出窗口例子
+		p.find("a.reloadpop").unbind().bind("click",function(){
+			WINDOW.reload("popoutdetail");
+		})
+	}
+	
+	//datagrid行点击
+	function dataGridClick(rowIndex,rowData){ 
+		WINDOW.open({"name":"datagrid_"+rowIndex,"width":0.8,"height":0.8,"url":"pages/report/showReport.html","fullscreen":true,"title":rowData.reportName},rowData)
+	}
+	
+	//查询
+	function StartSearch(){
+		if(SearchForm.check()){ //数据校验
+			var searchCondition=SearchForm.getData();//获取表单条件
+			//刷新DataGrid
+			p.find("#tt").datagrid("reload",searchCondition);
+		}
+	}
+	
+	//子窗口刷新父页面组件
+	this.refesh=function(){
+		p.find("#tt").datagrid("reload");
+	}
+	
+	this.getMsgFromChild=function(msg){
+		WINDOW.hideSide();//隐藏侧面内容
+		$.alert(msg)	
+	}
+
+}
+</script>
+
+<!--内容部分start-->
+
+
+<!--表格-->
+<div class="datalist">
+  <div id="tt"> </div>
+</div>
+<!--内容部分end--> 

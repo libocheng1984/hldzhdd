@@ -1,0 +1,285 @@
+<meta charset="utf-8">
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	var loop;
+        var looptime=10000;
+        var lasttime;
+        var Mp3Player;
+	var Player;
+        var LIST;
+        var Loader;
+	//窗口缩放尺寸设置
+	this.resize=function(){
+		//p.find(".datalist").height(p.WRAPER.height()-p.find(".pageTopBox").outerHeight(true));
+                //alert(p.WRAPER.height());
+                p.find(".keyList").height(p.WRAPER.height());	
+		//p.find("#tt").datagrid("resize"); 
+	}
+        
+        this.DESTROY=function(){ 
+		//清除播放器
+                
+		if(Player){
+               
+			Player.destroy();
+			Player=null;	
+		}
+                
+		if(Mp3Player){
+			Mp3Player.destroy();
+			Mp3Player=null;	
+		}
+                
+                if(loop)
+                {
+                    clearTimeout(loop);
+                    loop=null;
+                   
+                }
+                 
+                if(Loader)
+                {
+                    Loader.unbind();
+                    Loader.destroy();
+                    Loader=null;
+                }
+                
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+        
+	var SearchForm;
+	this.READY=function(){
+		
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",function(e,option){ 
+			p.resize();
+		});
+                //更新一行数据的例子------------------------------------
+		p.find("#insertButton").bind("click",function(){ 		
+			var newRow= {"guid":"112","orgname":"高新区分局","username":"李晓晓","createtime":"2015-5-25","content":"这是新的一行数据","zp":"","yy":"http://localhost:9012/host/mp3/01.mp3","sp":""}			
+			LIST.insert(newRow,0);//插入新数据
+			LIST.removeRowsFrom(200);//删除200以后的行
+		});		
+		
+		//视频播放器
+		Player=new playFlvVideo(framePos+"frame/",9999);//swf文件位置相对当前页的
+		
+		LIST=new ListView(p.find(".fm_listTemp")); 
+		//绑定点击事件 
+                /*
+		$(LIST).unbind("LI_CLICKED").bind("LI_CLICKED",function(e,lidata){ 
+			var guid=lidata["data"]["guid"];
+			alert("此处打开详情窗口，ID："+guid)
+                        
+		}) 
+                */
+		
+		//列表格式化例子------------------------------------------
+		var ListFormater=function(oneRow){
+			var actionbut='';
+			actionbut+=(oneRow["zp"]?'<a class="but-small but-green" id="butzp" rel="'+oneRow["zp"]+'"><i class="fa fa-picture-o"></i>图片</a>':'');
+			actionbut+=(oneRow["yy"]?'<a class="but-small  but-green" id="butyy" rel="'+oneRow["yy"]+'"><i class="fa fa-volume-up"></i>声音</a>':'');
+			actionbut+=(oneRow["sp"]?'<a class="but-small but-green" id="butsp" rel="'+oneRow["sp"]+'"><i class="fa fa-play-circle"></i>视频</a>':'');
+			actionbut+='<a class="but-small but-green" id="butdetail"  rel="'+oneRow["guid"]+'"><i class="fa fa-file-word-o"></i>详情</a>';
+            //actionbut+='<a class="but-small but-red" id="butsend"  rel="'+oneRow["guid"]+'"><i class="fa fa-comments"></i>转发</a>';
+                        
+			oneRow["actionbut"]=actionbut;			
+			oneRow["content"]=oneRow["content"]?oneRow["content"]:"无描述...";
+			return oneRow;
+		}
+		
+		//格式化独立事件绑定------------------------------------
+		var ActionFormater=function(RowObj){
+			RowObj.find(".butbox a").bind("click",function(){
+				var target=$(this).attr("rel"); 
+				switch($(this).attr("id")){
+					case "butzp":
+                                    //显示图片
+                                    var PICS=new MulitPicShow(target,{"width":0.4,"height":0.6});
+                                    break;
+					case "butyy":  
+						//播放声音
+						if(Mp3Player){
+							Mp3Player.destroy();
+							Mp3Player=null;	
+						}
+						Mp3Player=new PlaySound(target,true,$(this));
+						break;	
+					case "butsp":
+						//播放视频						
+						Player.play(target,$(this));
+						break;	
+					case "butsend":
+						//分享消息
+						alert(target)
+						break;
+                                        case "butdetail":
+						//显示详情
+						WINDOW.open({"name":target+'_IntelligenceDetailed',"width":600,"height":300,"url":"pages/qjfx/IntelligenceDetailed.html","title":"情报详细",'position':'right_bottom'},{"record":{"guid":target},"winId":p.WINID});
+						break;
+                                                
+				}
+				return false;
+			})
+		}
+		//获取数据
+                $(LIST).one("LOADED",startLoop);
+		LIST.load("php/ajfx/getIntelligenceList.php",{"event":"listTemp","content":{"condition":{}},"extend":{}},ListFormater,ActionFormater); //获取数据
+		//列表格式化例子------------------------------------------
+		p.resize();
+	}
+        function startLoop(e)
+        {
+            var data=LIST.getData();
+            if(data[0])
+            {
+                lasttime=data[0].createtime;
+            }
+            
+            loop=setTimeout(loaddata,looptime);
+        }
+        function loaddata()
+        {
+           
+            var postData={
+				"event":"loop",
+				"extend":{"eventswitch":"load"},
+				"content":{"condition":{"lastTime":lasttime}}
+			};
+		Loader=new AJAXObj(); 
+		$(Loader).one("JSON_LOADED",function(e,backJson){	
+			var result = backJson['value'];
+                         //alert('当前页数据量:'+data.rows.length);
+			if(result){
+				if(result.rows&&result.rows.length>0)
+                                {
+                                    //alert(result.rows[0].createtime);
+                                    lasttime=result.rows[0].createtime;
+                                    for(var i = 0 ;i<result.rows.length;i++)
+                                    {                             
+                                        var data=LIST.getData(); 
+                                        var flagGuid = false;
+                                            for(var j=0;j<data.total;j++)
+                                            {
+                                                if(data.rows[j].guid==result.rows[i].guid)
+                                                {
+                                                  flagGuid=true;
+                                                  break;
+                                                }
+                                            }
+                                            if(flagGuid)
+                                            {
+                                                continue;
+                                            }
+                                             var newRow= result.rows[i];			
+                                             LIST.insert(newRow,0);//插入新数据
+                                    
+                                    }
+                                     LIST.removeRowsFrom(200);//删除200以后的行
+                                   
+                                }
+                                /*
+                                 var data=$('#tt').datagrid('getData');
+                                if(data.total>400)
+                                {
+                                    for(var i=400;i<data.total;i++)
+                                    {
+                                        $('#tt').datagrid('deleteRow',i);
+                                    }
+                                }
+                                */
+			}
+		});
+		Loader.POSTDATA("php/ajfx/getIntelligenceList.php",postData);
+                loop=setTimeout(loaddata,looptime);
+        }
+      
+	
+	
+}
+</script>
+<style type="text/css">
+.keyList {
+	overflow-x: hidden;
+	overflow-x: auto;
+}
+
+.keyList li {
+	padding: 6px;
+	box-shadow: 0px 0px 4px #eee;
+	background-color: #FFF;
+	margin-top: 5px;
+	margin-right: 0px;
+	margin-bottom: 5px;
+	margin-left: 0px;
+}
+.keyList li p {
+	font-size: 12px;
+	line-height: 20px;
+	margin: 0px;
+	padding-top: 6px;
+	padding-right: 6px;
+	padding-bottom: 6px;
+	padding-left: 6px;
+}
+.keyList li h4 {
+	font-size: 12px;
+	background-color: #F0F0F0;
+	line-height: 18px;
+	font-weight: normal;
+	margin-top: 2px;
+	margin-right: 0px;
+	margin-bottom: 0px;
+	margin-left: 0px;
+	padding-top: 3px;
+	padding-right: 6px;
+	padding-bottom: 3px;
+	padding-left: 6px;
+	color: #666;
+}
+.keyList  li h4 dd {
+	margin: 0px;
+	padding: 0px;
+	float: right;
+}
+.keyList li .butbox {
+	border-top-width: 1px;
+	border-top-style: dotted;
+	border-top-color: #CCC;
+	padding-top: 4px;
+	padding-right: 3px;
+	padding-bottom: 4px;
+	padding-left: 3px;
+	text-align: right;
+}
+
+.keyList li .butbox a.disabled {
+	background-color: #C6C6C6;	
+}
+.keyList li .butbox a i  {
+	margin-right: 3px;
+	margin-left: 3px;	
+}
+</style>
+<!--内容部分start-->
+
+<!--表格-->
+<div class="keyList">
+  <ul class="fm_listTemp">
+    <li>
+      <p>内容：<span id="content"></span></p>
+      <div class="butbox" id="actionbut"> </div>
+      <h4><dd>上传于<span id="createtime" class="chattime"></span></dd><span id="username"></span> [ <span id="orgname"></span> ] </h4>
+      
+    </li>
+  </ul>
+</div>
+
+
+<!--内容部分end-->
+

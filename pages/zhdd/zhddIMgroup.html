@@ -1,0 +1,104 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	var TABBox;
+        var LIST;
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		if(TABBox){
+			TABBox.resize();
+		}
+	}
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){ 
+                
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+            
+                //列表格式化例子------------------------------------------
+		LIST=new listTemplete(p.find(".fm_listTemp"));
+		//绑定点击事件 
+		$(LIST).unbind("LI_CLICKED").bind("LI_CLICKED",function(e,lidata){ 
+			var groupid=lidata["data"]["groupid"];
+			WEBCHAT.openGroup(groupid,true);
+		}) 
+		//绑定聊天组删除事件
+		$(WEBCHAT).unbind("DELETE_GROUP").bind("DELETE_GROUP",function(e,groupVar){
+			LIST.findAndRemove("groupid",groupVar["groupid"]);
+		}).unbind("CREAT_GROUP").bind("CREAT_GROUP",function(e,groupJson){
+			var group=LIST.find("groupid",groupJson["groupid"]);
+			if(!group){
+				LIST.insert(groupJson);		
+			}
+		})
+                var ListFormater=function(oneRow){ 
+			oneRow["xxnr"]=oneRow["xxnr"]?oneRow["xxnr"]:"...";
+			oneRow["xxnr"]=oneRow["jingqing"]?'<a rel="'+oneRow["jingqing"]+'" class="showJingqing red" title="'+oneRow["jingqing"]+'">[ 查看相关警情 ]</a> '+oneRow["xxnr"]:oneRow["xxnr"];
+			return oneRow;
+		}
+		
+		//格式化独立事件绑定------------------------------------
+		var ActionFormater=function(RowObj){
+			RowObj.find("a.showJingqing").bind("click",function(){
+				var jingqing=$(this).attr("rel");
+				//alert("此处打开警情窗口，ID："+jingqing)
+                                var postData={
+				"event":"",
+				"extend":{},
+				"content":{"condition":{"jqbh":jingqing}}
+                                };
+                        var Loader=new AJAXObj();
+                        $(Loader).bind("JSON_LOADED",function(e,backJson){	
+                                var rowData = backJson.value;
+                                if(rowData){
+                                      //console.log(rowData.records);
+                                       WINDOW.open({"name":"IMopenJq","width":800,"height":400,"url":"pages/zhdd/eventViewLBC.html","title":"警情详细",'position':'left_bottom'},{"record":rowData.records[0]},$(this));
+                                }else{
+                                        $.message("该警情不存在!");
+                                }
+                        });
+                                Loader.POSTDATA("php/event/GetSimpleById.php",postData);
+                                
+
+				return false;
+			})
+		}
+		//获取数据
+		LIST.load("php/communication/GetMsgGroups_web.php",{"event":"listTemp","content":JSON.stringify({"condition":{"userId":userData.userId}}),"extend":{}},ListFormater,ActionFormater);//获取数据
+		//列表格式化例子------------------------------------------
+	}
+	
+	
+	
+       
+       
+        function MSGgroupClick()
+        {
+            //alert($(this).attr("data-groupid"));
+            WEBCHAT.openGroup($(this).attr("data-groupid"),true);
+        }
+        //异步树过滤器
+       
+}
+</script>
+
+<div class="chatGroupList">
+    <ul class="fm_listTemp">
+    <li><h1><span id="fssj" class="fssj"></span><span id="groupname"></span></h1><p id="xxnr"></p></li>
+    </ul>
+</div>
+  
+
+<!--内容部分end--> 
+
+
+
+

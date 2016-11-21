@@ -1,0 +1,292 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行READY方法，代替document.ready执行
+//重要：写在ACTION外的方法是全局方法，尽量不要这么干，以免方法冲突。
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//重要：页面关闭的时候会尝试执行DESTROY方法，请在这里解除事件绑定，销毁对象，以免窗体残留。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+//重要：保证标签完整闭合，否则IE8报错 “ACTION_Window_1426578029038953”未定义
+function ACTION(){
+	var p=this;	
+	var processRecord = null;
+	var feedBackRecord = null;
+	var record = {};
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){ 
+		p.find(".datalist").height(p.WRAPER.height()-p.find(".pageTopBox").outerHeight(true)); 
+		p.find("#tt").datagrid("resize"); 
+	}
+	
+	var SearchForm;
+	
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){
+		processRecord = p.CONDITION['record'];
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+		
+		
+		SubmitForm=new formDeal(p.find("#Form"));
+		$(SubmitForm).one("HTML_FORMATED",getFormData);//绑定格式化完成事件，执行下一步
+		SubmitForm.parse();
+		//更新一下尺寸
+		p.resize();
+	}
+	
+	//编辑状态，获取数据
+	function getFormData(){ 
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){ //alert(backJson)
+			feedBackRecord= backJson["value"]['records'];
+			//alert(JSON.stringify(feedBackRecord));
+			$.extend(record,processRecord,feedBackRecord)
+			SubmitForm.bindData(record);//绑定数据		
+			feedBackData();		
+		})
+		Loader.POSTDATA("php/event/GetFeedbackById.php",{"event":"FormEdit","content":{"condition":{"cjdbh":processRecord['cjdbh']}},"extend":{}});				
+		p.find("#cancelButton").bind("click",function(){ 
+			WINDOW.	close(p.WINID);//关闭窗口
+		});
+	}
+	
+	function feedBackData(){
+		var Loader_resouce=new AJAXObj();
+		$(Loader_resouce).bind("JSON_LOADED",function(e,backJson){	
+			var records= backJson["value"]['records'];
+			//alert("111");
+			if(records.length>0){
+				var imgObj = "";
+				var andioObj = "";
+				for(var i=0;i<records.length;i++){
+					//console.log(records[i]['zylx']);
+					if(imgObj==""&&records[i]['zylx']=="1"){
+						imgObj+=records[i]['zydz'];
+						continue;
+					}else if(andioObj==""&&records[i]['zylx']=="2"){
+						andioObj+=records[i]['zydz'];
+						continue;
+					}
+					
+					if(records[i]['zylx']=="1"){
+						imgObj+=","+records[i]['zydz'];
+					}else if(records[i]['zylx']=="2"){
+						andioObj+=","+records[i]['zydz'];
+					}
+				}
+				//alert(andioObj);
+				p.find("#imgTd").changeValue(imgObj); //alert(p.find("#imgAudio").length)
+				p.find("[name=imgAudio]").changeValue(andioObj);
+			}
+		})
+		Loader_resouce.POSTDATA("php/event/GetFile_web.php",{"event":"FormEdit","content":{"condition":{"zlbh":processRecord['zlbh'],"cjdbh":processRecord['cjdbh']}},"extend":{}});
+	}
+
+
+}
+</script>
+
+<!--内容部分start-->
+<!--表格-->
+<div class="formBox">
+  <form id="Form">
+    <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" >
+	  <!-- 反馈信息 -->
+	  <!-- start -->
+	   <tr>
+	    <th align="right"><i>反馈图片</i></th>
+	    <td colspan="3"><div class="fm_uploadPicsShow uppicbox" data-option="{'rel':'xyzd','editable':false}"></div>
+          <input  type="hidden" name="xyzd" id="imgTd"  /></td>
+	  </tr>
+	  <tr>
+	    <th align="right"><i>反馈语音</i></th>
+	    <td colspan="3" id="imgYx"> <input  type="text" name="imgAudio" class="fm_voicePlay fm_leaveit" /></td>
+	  </tr>
+	  <tr>
+        <th colspan="4" align="center"><i>案件反馈信息</i></th>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>反馈单编号</i></th>
+		<td><span id="fkdbh"></span></td>
+        <th width="20%" align="right"><i>反馈员编号</i></th>
+		<td><span id="fkybh"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>反馈人姓名</i></th>
+		<td><span id="fkyxm"></span></td>
+        <th align="right"><i>抓获人数</i></th>
+		<td><span id="zhrs"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>涉案人数</i></th>
+		<td><span id="sars"></span></td>
+        <th align="right"><i>救助人数</i></th>
+		<td><span id="jzrs"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>救助人说明</i></th>
+		<td><span id="jzrssm"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>解救人数</i></th>
+		<td><span id="jjrs"></span></td>
+        <th align="right"><i>逃跑人数</i></th>
+		<td><span id="tprs"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>解救人说明</i></th>
+		<td><span id="jjrssm"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>解救妇女人数</i></th>
+		<td><span id="jjfvrs"></span></td>
+        <th align="right"><i>解救儿童人数</i></th>
+		<td><span id="jjetrs"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>受伤人数</i></th>
+		<td><span id="ssrs"></span></td>
+        <th align="right"><i>死亡人数</i></th>
+		<td><span id="swrs"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>受伤人数说明</i></th>
+		<td><span id="ssrssm"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>死亡人数说明</i></th>
+		<td><span id="swrssm"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>待救援人数</i></th>
+		<td><span id="djyrs"></span></td>
+        <th align="right"><i>出警人员受伤人数</i></th>
+		<td><span id="cjryssrs"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>出警人员死亡人数</i></th>
+		<td><span id="cjryswrs"></span></td>
+        <th align="right"><i>留置审查人数</i></th>
+		<td><span id="lzscrs"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>经济损失</i></th>
+		<td><span id="jjssqk"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>挽回经济损失</i></th>
+		<td><span id="whjjssqk"></span></td>
+      </tr>
+      <tr>
+        <th align="right"><i>是否破获刑事案件</i></th>
+		<td><span id="sfphxsaj"></span></td>
+        <!--<td><input  type="radio" name="sfphxsaj" value="1"/>是&nbsp;<input  type="radio" name="sfphxsaj" value="2"/>否</td>-->
+        <th align="right"><i>是否查处治安案件</i></th>
+		<td><span id="sfcczaaj"></span></td>
+        <!--<td><input  type="radio" name="sfcczaaj" value="1"/>是&nbsp;<input  type="radio" name="sfcczaaj" value="2"/>否</td>-->
+      </tr>
+      <tr>
+        <th align="right"><i>是否解决纠纷</i></th>
+		<td><span id="sfjjjf"></span></td>
+        <!--<td colspan="3"><input  type="radio" name="sfjjjf" value="1"/>是&nbsp;<input  type="radio" name="sfjjjf" value="2"/>否</td>-->
+      </tr>
+      <tr>
+        <th align="right"><i>警情处理结果</i></th>
+		<td><span id="jqcljg"></span></td>
+        <!--<td colspan="3"><input  type="text" name="jqcljg"  style="width:96%" /></td>-->
+      </tr>
+      <tr>
+        <th colspan="4" align="center"><i>消防反馈信息</i></th>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>火灾等级代码</i></th>
+		<td><span id="hzdjdm"></span></td>
+        <th width="20%" align="right"><i>天气情况代码</i></th>
+		<td><span id="tqqkdm"></span></td>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>火灾原因代码</i></th>
+		<td><span id="hzyydm"></span></td>
+        <th width="20%" align="right"><i>灾害事故类型代码</i></th>
+		<td><span id="zhsglxdm"></span></td>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>起火物代码</i></th>
+		<td><span id="qhwdm"></span></td>
+        <th width="20%" align="right"><i>起火建筑结构代码</i></th>
+		<td><span id="qhjzjgdm"></span></td>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>火灾场所代码</i></th>
+		<td><span id="hzcsdm"></span></td>
+        <th width="20%" align="right"><i>现场总指挥</i></th>
+		<td><span id="xczzh"></span></td>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>第一出动时间</i></th>
+		<td><span id="dycdsj"></span></td>
+        <!--<td width="30%"><input style="width:200px"  class="fm_dateinput"  value=""  data-option="{'data':'y,m,d,h,t,s','force2':true}"  name="dycdsj" type="text" /></td>-->
+        <th width="20%" align="right"><i>第一到场时间</i></th>
+		<td><span id="dydcsj"></span></td>
+        <!--<td width="30%"><input style="width:200px"  class="fm_dateinput"  value=""  data-option="{'data':'y,m,d,h,t,s','force2':true}"  name="dydcsj" type="text" /></td>-->
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>火场扑灭时间</i></th>
+		<td><span id="hcpmsj"></span></td>
+        <!--<td width="30%"><input style="width:200px"  class="fm_dateinput"  value=""  data-option="{'data':'y,m,d,h,t,s','force2':true}"  name="hcpmsj" type="text" /></td>-->
+        <th width="20%" align="right"><i>撤离时间</i></th>
+		<td><span id="clsj"></span></td>
+        <!--<td width="30%"><input style="width:200px"  class="fm_dateinput"  value=""  data-option="{'data':'y,m,d,h,t,s','force2':true}"  name="clsj" type="text" /></td>-->
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>出动水枪数</i></th>
+		<td><span id="cdsqs"></span></td>
+        <th width="20%" align="right"><i>下落不明人数</i></th>
+		<td><span id="xlbmrs"></span></td>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>是否重点单位</i></th>
+		<td><span id="sfzddw"></span></td>
+        <!--<td width="30%"><input  type="radio" name="sfzddw" value="1"/>是&nbsp;<input  type="radio" name="sfzddw" value="2"/>否</td>-->
+        <th width="20%" align="right"><i>重点单位名称</i></th>
+		<td><span id="zddwbm"></span></td>
+        <!--<td width="30%"><input  type="text" name="zddwbm"  style="width:200px" /></td>-->
+      </tr>
+      <tr>
+        <th colspan="4" align="center"><i>交通反馈信息</i></th>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>交通事故形态代码</i></th>
+		<td><span id="jtsgxtdm"></span></td>
+        <th width="20%" align="right"><i>是否装载危险品</i></th>
+		<td><span id="sfwhp"></span></td>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>交通事故初查原因代码</i></th>
+		<td><span id="sgccyydm"></span></td>
+        <th width="20%" align="right"><i>能见度代码</i></th>
+		<td><span id="njddm"></span></td>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>路面状况代码</i></th>
+		<td><span id="lmzkdm"></span></td>
+        <th width="20%" align="right"><i>损坏机动车数</i></th>
+		<td><span id="shjdcs"></span></td>
+      </tr>
+      <tr>
+        <th width="20%" align="right"><i>损坏非机动车数</i></th>
+		<td><span id="shfjdcs"></span></td>
+        <th width="20%" align="right"><i>道路类型代码</i></th>
+		<td><span id="dllxdm"></span></td>
+      </tr>
+	  <!-- end -->
+  </table>
+  </form>
+</div>
+<!--内容部分end--> 
+<div class="submitButs"><a  id="cancelButton" class="but-normal but-greenlight"> <i class="fa fa-reply"></i> 返回</a></div>
+
+

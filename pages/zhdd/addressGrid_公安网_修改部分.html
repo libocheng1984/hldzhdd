@@ -1,0 +1,136 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	var address = "";
+	var parentId = "";
+	var addArr = new Array();
+	
+	//窗口缩放尺寸设置
+	this.resize=function(){
+		p.find(".datalist").height(p.WRAPER.height()-p.find(".pageTopBox").outerHeight(true));
+		p.find("#tt").datagrid("resize"); 
+	}
+	
+	var SearchForm;
+	
+	this.READY=function(){
+		address = p.CONDITION["address"];
+		//alert(address);
+		address = encodeURI(address);
+		parentId = p.CONDITION["winId"]
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",function(e,option){ 
+			p.resize();
+		})
+		
+		
+		//表格例子------------------------------------------EasyUI组件
+		var clumoption=[[
+			//{field:'address',title:'地址',width:"97%",fixed:true,align:"left"}
+			{field:'address',title:'地址',width:"40%",fixed:true,align:"left"},
+			{field:'parentName',title:'分局名称',width:"28%",fixed:true,align:"left"},
+			{field:'orgName',title:'派出所名称',width:"30%",fixed:true,align:"left"}
+			]];
+		p.find("#tt").datagrid({
+			//url:"php/trans.php",
+			//queryParams:{"url":"http://192.168.1.14:8081/zhdd/apps/php/event/SearchOrg.php"}, //附加参数对象
+			//loadFilter:formatHostJson,  //格式过滤器
+			fit:true,
+			showFooter:true,//显示总计??
+			rownumbers:true,//行号
+			singleSelect:true,
+			fitColumns:true,//宽度自适应
+			striped:true,//条纹
+			pagination:false,//分页
+			//onDblClickRow:ShowDetailRight,
+			columns:clumoption,
+			onClickRow:onClickRow,
+			//onLoadSuccess:function(data){
+			
+			//}
+		})
+
+		//var url = "http://10.78.17.203:9999/?operation=GetAddressByTextSearch&content={   'data':[     {       'address':'"+
+		//address+"'     }   ],   'pageindex':0,   'pagesize':10 }";
+		//alert(address);
+		//var url = "http://10.78.17.203:9999/?operation=GetAddressByTextSearch&content={%20%22data%22:[%20{%20%22address%22:%22" + address + "%22%20}%20],%20%22pageindex%22:0,%20%22pagesize%22:10%20}";
+		var url = "http://10.78.17.154:9999/bls?operation=FullTextRetrieval_GetAddressByName_v001&license=a756244eb0236bdc26061cb6b6bdb481&content={%20%22data%22:[%20{%20%22address%22:%22" + address + "%22%20}%20],%20%22pageindex%22:0,%20%22pagesize%22:10%20}";
+		//http://10.78.17.154:9999/bls?operation=FullTextRetrieval_GetAddressByName_v001&license=a756244eb0236bdc26061cb6b6bdb481&content={"data":[{"address":"3"}],"pageindex":0,"pagesize":10}
+		console.log(url);
+		var postData={
+			"event":"TRANS",
+			"extend":{"eventswitch":"search"},
+			"content":{"condition":{"url":url}}
+		};
+		//console.log(url);
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){
+			//alert(JSON.stringify(backJson));
+			var value = backJson['value'];
+			//console.log(value);
+			//alert(value);
+			value = value.replace(/\s/g,"");
+			value = eval("("+value+")");
+			//alert(JSON.stringify(value));
+			addArr = value['data'];
+			//alert(JSON.stringify(addArr));
+			for (var i=0;i<addArr.length;i++) {
+				for (var j=0;j<bmdmData.length;j++) {
+					if(addArr[i]['substationCode']==bmdmData[j]['orgCode']){
+						addArr[i]['parentCode']=bmdmData[j]['parentCode'];
+						addArr[i]['parentName']=bmdmData[j]['parentName'];
+						addArr[i]['orgName']=bmdmData[j]['orgName'];
+					}
+				}
+			}
+			if(addArr){
+				p.find("#tt").datagrid("loadData",addArr)
+			}
+		});
+		$(Loader).bind("SYS_ERROR",function(e,msg){
+			$.error("全文检索失败!");
+			WINDOW.close(p.WINID);
+		});
+		Loader.POSTDATA("php/trans.php",postData);
+
+		//var store = mainWindow.eventStore;
+		//p.find("#tt").datagrid("loadData",store)
+		//p.find("#tt").datagrid("loadData",addArr)
+		//更新一下尺寸
+		p.resize();
+		
+	}
+	
+	function onClickRow(rowIndex, rowData){
+		var parentWindow=WINDOW.getActionById(p.CONDITION["winId"])
+		parentWindow.addEventMarker(rowData.address,rowData.x,rowData.y,rowData.substationCode,rowData.orgName)
+		//parentWindow.addEventMarker("辽宁省 大连市 西岗区 民政街 靠近大连金田电脑商行","121.614551","38.911162","210203440000");
+		WINDOW.close(p.WINID);
+	}
+	
+	
+	
+	//子窗口刷新父页面
+	this.refesh=function(){
+		p.find("#tt").datagrid("reload");
+	}
+	
+	this.getMsgFromChild=function(msg){
+		WINDOW.closeSide();//关闭侧面内容
+		$.alert(msg)	
+	}
+
+}
+</script>
+<p></p>
+<!--表格-->
+<div class="datalist">
+  <div id="tt"> </div>
+</div>
+
+<!--内容部分end--> 
+

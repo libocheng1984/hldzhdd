@@ -1,0 +1,56 @@
+.op_popUpContainer {
+	padding-bottom: 16px;
+	position: absolut;
+	z-index: 999;
+	top: 0px;
+	left: 0px;
+}
+.op_popUpContainer .op_popUpContent {
+	background-color: #FFF;
+	margin: 0px;
+	border-radius: 8px;
+	min-width: 100px;
+	max-width: 400px;
+	min-height: 40px;
+	max-width: 200px;
+	overflow: auto;
+	box-shadow: 1px 1px 5px #666666;
+	position: relative;
+	padding: 10px;
+}
+.op_popUpContainer .op_popUpPin{
+	background-image: url(pop.png);
+	background-repeat: no-repeat;
+	background-position: center bottom;
+	position: absolute;
+	height: 16px;
+	left: 0px;
+	right: 0px;
+	bottom: 0px;
+}
+.op_popUpContainer .op_popUpClose{
+	background-image: url(pop-02.png);
+	background-repeat: no-repeat;
+	height: 13px;
+	width: 13px;
+	position: absolute;
+	top: 3px;
+	right: 3px;
+	cursor: pointer;
+}
+.op_popUpContainer .op_popUpContent p{
+	line-height: 20px;
+	margin: 0px;
+	padding: 0px;
+}
+.op_popUpContainer .op_popUpActionBut {
+	text-align: center;
+	margin-top: 6px;
+	border-top-width: 1px;
+	border-top-style: dotted;
+	border-top-color: #DDD;
+	padding-top: 6px;
+	padding-right: 3px;
+	padding-bottom: 0px;
+	padding-left: 3px;
+}

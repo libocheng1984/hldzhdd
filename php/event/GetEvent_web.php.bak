@@ -1,0 +1,13 @@
+<?php
+	header('Content-Type: text/html; charset=UTF-8');
+	header("Expires: 0");
+	header("Cache-Control: no-cache" );
+	header("Pragma content: no-cache");
+	session_start();
+	session_commit();
+?>
+<?php
+
+	echo "2123123123123123123123123123123321";
+	
+?>

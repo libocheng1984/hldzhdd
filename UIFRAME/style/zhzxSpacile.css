@@ -1,0 +1,20 @@
+@charset "utf-8";
+/* 指挥中心烂大屏专用高对比模式 */
+
+i,em {
+	font-style: normal;
+}
+.formBox th,.detailBox th,.formBox td,.detailBox td{
+	color: #000;	
+}
+.fm_AccordionBar {
+	color: #000;	
+}
+.splittitle{
+	color: #000;	
+}
+
+.fm_AccordionBar.cantopen  {
+	background-color: #F2F2F2;
+	color: #444;	
+}

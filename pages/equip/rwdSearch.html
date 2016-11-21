@@ -1,0 +1,255 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION.READY方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	var Tree;
+	var rwdLayer;
+	var mapObj;
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){  
+		p.find(".treeWraper").height(p.WRAPER.height()-165);	//p.find(".pageTopBox").outerHeight(true)-p.find(".searchBox").outerHeight(true)
+	}
+	
+	this.DESTROY=function(){ 
+		clearInfoWindow();
+		rwdLayer.removeAllFeatures();
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){  
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+		
+		//表单处理
+		SearchForm=new formDeal(p.find("#searchForm"));//创建表单
+		SearchForm.parse();//格式化表单	
+		//绑定查询按钮点击
+		p.find("#searchButton").bind("click",StartSearch);
+		p.find("#cancelButton").bind("click",function(){
+			WINDOW.close(p.WINID);	
+		});			
+		
+//		//更新一下尺寸
+		p.resize();		
+		
+		//安装树EasyUI
+		var treeoption={
+			"url":"php/system/GetOrgTree.php",
+			queryParams:{"event":"FormEdit","content":JSON.stringify({"condition":{"orgCode":userData.orgCode}}),"extend":{}}, //附加参数对象
+			"animate":true,
+			"checkbox":true,
+			"onlyLeafCheck":false, //只选叶子
+		  	"cascadeCheck":true, //级联检查
+		  	"exceptNobranch":true,//在结果中去除树枝
+		 	 "method":"post",
+		 	 "onBeforeLoad":function(node,param){ //加载分支前附加参数
+			 	 if(node){
+			 	 	param?param["value"]=node["value"]:{"value":node["value"]}
+			 	 }
+			  },
+		 	"loadFilter":myLoadFilter
+		  }
+		  
+		  //Tree=new TreeSelector(p.find("#bumentree"),treeoption,null,true,p.CONDITION);
+		p.find("#bumentree").tree(treeoption);
+	}
+	
+	
+	//查询
+	function StartSearch(){
+		var bmData = [];
+		var searchCondition=SearchForm.getData();//获取表单条件
+		var selectedData=p.find("#bumentree").tree("getChecked");
+		for (var i=0;i<selectedData.length;i++){
+			bmData.push({"text":selectedData[i]['text'],"value":selectedData[i]['value']});
+		}
+		if(bmData.length==0&&searchCondition['kdsj']==""){
+			$.message("请输入查询条件",2000);
+			return;
+		}
+		var postData={
+					"event":"TRANS",
+					"extend":{"eventswitch":"search"},
+					"content":{"condition":bmData,"value":searchCondition}
+				};
+		//console.log(url);
+		if(rwdLayer){
+			clearInfoWindow();
+			rwdLayer.removeAllFeatures();
+		}
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){
+			if (backJson['head']['code'] == 0) {
+				$.alert(backJson['head']['message']);
+			} else {
+				if(backJson['value'].length>0){
+					for (var i=0;i<backJson['value'].length;i++){
+						addFeature(backJson['value'][i]);
+					}
+				}else{
+					 $.message("未查询到任务卡点信息");
+				}
+			}
+		});
+		//TODO
+		Loader.POSTDATA("php/equip/GetRwdSearch_web.php",postData);
+			//获取树选中
+			//....
+			//刷新地图点信息	
+			//....		
+	}
+	
+	function addFeature(rowData){
+		if(!mapObj){
+			mapObj = mainWindow.mapObj;
+		}
+		if(!rwdLayer){
+			rwdLayer = mapObj.getLayersByName("任务点")[0];
+			rwdLayer.setVisibility(true);
+		}
+		clearInfoWindow();
+		var features = rwdLayer.getFeatureById(rowData.kdid);
+		if(!features){
+			var img = "images/zhdd/rwd.png";
+			var point = OpenLayers.Geometry.fromWKT(rowData.geometry);
+			
+			var ft = new OpenLayers.Feature.Vector();
+			ft.geometry = point;
+			ft.id = rowData.kdid;
+			ft.style = {
+				cursor: "pointer",
+				label: rowData.kdmc,
+				fontWeight: "bold",
+				fontColor:"#ffffff",
+				labelOutlineWidth: 3,
+				labelOutlineColor: "#4089be",
+				labelYOffset:-26,
+				labelXOffset:0,
+				graphicWidth:24,   
+				graphicHeight : 24,   
+				graphicXOffset : -12,   
+				graphicYOffset : -12, 
+				externalGraphic : img
+			};
+			ft.info = rowData;
+			rwdLayer.addFeatures(ft);
+		}
+//		var point = OpenLayers.Geometry.fromWKT(rowData['geometry']);
+//		point = new OpenLayers.LonLat(point.x, point.y); 
+//		mapObj.setCenter(point);
+	}
+	
+	/*清除所有popup*/
+	function clearInfoWindow(){
+		//selectFeature.unselectAll();
+		if(!mapObj){
+			return;
+		}
+		var popArr = mapObj.popups;
+		if(!(popArr&&popArr.length>0)){
+			return;
+		}
+		for (var i=0;i<popArr.length;i++){
+			mapObj.removePopup(popArr[i]);
+		}
+	}
+	
+	//异步树过滤器
+	function myLoadFilter(data, parent){
+		data=formatHostJson(data);//全局过滤
+		
+		var state = $.data(this, 'tree');
+		
+		function setData(){
+			var serno = 1;
+			var todo = [];
+			for(var i=0; i<data.length; i++){
+				todo.push(data[i]);
+			}
+			while(todo.length){
+				var node = todo.shift();
+				if (node.id == undefined){
+					node.id = '_node_' + (serno++);
+				}
+				if (node.children){
+					node.state = 'closed';
+					node.children1 = node.children;
+					node.children = undefined;
+					todo = todo.concat(node.children1);
+				}
+			}
+			state.tdata = data;
+		}
+		
+		function find(id){
+			var data = state.tdata; 
+			var cc = [data];
+			while(cc.length){
+				var c = cc.shift();
+				for(var i=0; i<c.length; i++){
+					var node = c[i]; 
+					if (node.id == id){
+						return node;
+					} else if (node.children1){
+						cc.push(node.children1);
+					}
+				}
+			}
+			return null;
+		}
+		
+		setData();
+		
+		var t = $(this);
+		var opts = t.tree('options');
+		opts.onBeforeExpand = function(node){
+			var n = find(node.id);
+			if (n.children && n.children.length){return}
+			if (n.children1){
+				var filter = opts.loadFilter;
+				opts.loadFilter = function(data){return data;};
+				t.tree('append',{
+					parent:node.target,
+					data:n.children1
+				});
+				opts.loadFilter = filter;
+				n.children = n.children1;
+			}
+		};
+		return data;
+	}
+}
+</script>
+
+<!--内容部分start-->
+<style type="text/css">
+.whitebk {
+	background-color: #FFF;
+}
+.treeWraper {
+	overflow: auto;
+}
+</style>
+
+<div class="pageTopBox">
+  <h1 class="pagetitle">任务点分布查询</h1>
+</div>
+<h1 class="pageSubtitle">时间段</h1>
+<div class="searchBox whitebk">
+  <form id="searchForm">
+    <input style="width:100%"  class="fm_datepartinput"  value=""  data-option="{'data':'h,t','force2':true,'fast':false}"  name="kdsj" type="text"/>
+  </form>
+</div>
+<h1 class="pageSubtitle">部门选择</h1>
+<div class="treeWraper whitebk">
+  <div id="bumentree"></div>
+</div>
+
+<!--提交按钮-->
+<div class="submitButs"><a  id="searchButton" class="but-normal but-red"><i class="fa fa-search"></i> 查询</a> <a  id="cancelButton" class="but-normal but-yellow"> <i class="fa fa-reply"></i> 关闭</a></div>
+<!--内容部分end--> 
+

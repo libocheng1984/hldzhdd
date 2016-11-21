@@ -1,0 +1,61 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	var SlideLayout; //布局对象
+		
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){ 
+		var H=p.WRAPER.height()-p.find(".titleWraper").outerHeight(true); 
+		p.find("#layout").setRealSize(null,H);		
+		if(SlideLayout){
+			SlideLayout.resize();
+		}
+	}	
+	
+	this.DESTROY=function(){ 
+		if(SlideLayout){
+			SlideLayout.destroy();
+			SlideLayout=null;	
+		}
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);		
+		SlideLayout=new slideLayout(p.find("#layout"));	
+		$(SlideLayout).bind("GOTO_PAGE",checkGotoPage);
+		//更新一下尺寸
+		p.resize();				
+		//加载第一屏数据
+		SlideLayout.goTo("step01","dataGridTemp",null,"任务列表");
+	}		
+	
+	//各步点击配置，由各步骤页面返回事件
+	function checkGotoPage(e,pageOption){ 
+            
+		switch(pageOption["stepid"]){
+			case "step01": 
+				SlideLayout.goTo("step02","pointTemp",pageOption["condition"],"任务信息");
+				break;
+			case "step02":
+				SlideLayout.goTo("step03","detailTemp",pageOption["condition"],"考勤记录");
+				break;
+			
+		}
+	}
+}
+</script>
+<!--内容部分start-->
+<div class="titleWraper">任务考核查询</div>
+<!--布局容器-->
+<div id="layout">
+  <div id="dataGridTemp" data-option="{'url':'pages/rwkhcx/taskListNew.html'}" >任务列表</div>
+  <div id="pointTemp" data-option="{'url':'pages/rwkhcx/pointListNew.html'}">考勤列表</div>
+  <div id="detailTemp" data-option="{'url':'pages/rwkhcx/signList.html'}">考勤详情</div>
+</div>
+<!--内容部分end--> 

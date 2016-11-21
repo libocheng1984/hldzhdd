@@ -1,0 +1,71 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	var LISTXL;
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		p.find("#kaoqindatarow").setRealSize(null,p.WRAPER.height()).css({"overflow":"auto"}); 
+	}
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){  
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+		
+		//列表格式化例子------------------------------------------
+		var ListFormater=function(oneRow){
+			oneRow["lastmsg"]=oneRow["lastmsg"]?oneRow["lastmsg"]:"...";
+			oneRow["lastmsg"]=oneRow["jingqing"]?'<a rel="'+oneRow["jingqing"]+'" class="checkKaoqin red" title="'+oneRow["jingqing"]+'">[ 审核 ] </a> '+oneRow["lastmsg"]:oneRow["lastmsg"];
+			return oneRow;
+		}
+		
+		//格式化独立事件绑定------------------------------------
+		var ActionFormater=function(RowObj){
+			RowObj.find("a.checkKaoqin").bind("click",function(){
+				var jingqing=$(this).attr("rel");
+				WINDOW.open({"name":"datagrid_detail","width":600,"height":400,"url":"pages/P_detail.html"},{"jingqing":jingqing},$(this));
+				return false;
+			})
+		}
+		
+		LISTXL=new ListView(p.find("#kaoqindatarow")); //列表容器，分页容器
+		//获取数据
+		LISTXL.load("host/listview.asp",{"event":"listTemp","content":{"condition":p.CONDITION},"extend":{}},ListFormater,ActionFormater); 
+		
+		//更新一下尺寸，注意执行时间点，一般放在最后
+		p.resize();		
+	}
+	
+}
+</script>
+
+<!--内容部分start-->
+<!--考勤信息-->
+<div id="kaoqindatarow" style="background-color:#fff;padding:10px;">
+  <div class="contBlock">
+    <table width="100%" border="0" cellspacing="0" cellpadding="0">
+      <tr>
+        <th width="100" align="right">点位名称</th>
+        <td width="200"  id="groupname">&nbsp;</td>
+        <th width="120" align="right">打卡时间</th>
+        <td>&nbsp;</td>
+      </tr>
+      <tr>
+        <th width="100" align="right">状态</th>
+        <td>&nbsp;</td>
+        <th align="right">附件</th>
+        <td id="lastmsg">&nbsp;</td>
+      </tr>
+    </table>
+  </div>
+</div>
+<!--内容部分end--> 
+

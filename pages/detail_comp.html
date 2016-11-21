@@ -1,0 +1,134 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		p.WRAPER.css("overflow","hidden")
+		p.find(".detailBox").css("overflow","hidden");//.addClass("beforeresize");
+		p.find(".detailBox,.zediewindow").height(p.WRAPER.height()-p.find(".submitButs").outerHeight(true))
+		p.find(".zediewindow").css("overflow-y","auto");
+		p.find(".mapbox").height(p.WRAPER.height()-p.find(".submitButs").outerHeight(true)).width(p.WRAPER.width()-400);
+	}
+	
+	//表单对象
+	var Detailobj;
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+		
+		//返回按钮事件
+		p.find("#cancelButton").bind("click",function(){ 
+			WINDOW.	close(p.WINID);//关闭窗口
+		});
+		
+		//表单例子------------------------------------------
+		
+		//表单格式化处理
+		Detailobj=new detailDeal(p.find("#Detail"));
+		$(Detailobj).one("HTML_FORMATED",getFormData);//绑定格式化完成事件，执行下一步
+		Detailobj.parse();	
+		
+		//表单例子------------------------------------------
+		
+		p.find(".zediewindow"). AccordionFrame();//折叠展开设置
+		
+		//更新一下尺寸
+		p.resize();	
+	}
+	
+	//获取数据
+	function getFormData(){
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){			
+			Detailobj.bindData(backJson["value"]);//绑定数据			
+		})
+		Loader.POSTDATA("/host/detail.asp",{"event":"FormEdit","content":{"condition":p.CONDITION},"extend":{}});				
+		
+	}
+}
+</script>
+<!--内容部分start-->
+
+<div style="position:relative;height:0px;width:100%">
+<div class="mapbox" style="background-color:#eee;position:absolute;left:400px;top:0px"></div>
+<div class="mapicon center" style="top:3px;right:3px"><i class="fa fa-crosshairs"></i></div>
+</div>
+<!--表单-->
+<div class="detailBox" id="Detail">   
+ <div class="zediewindow" style="width:400px;">
+     <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab"  data-option="{'title':'详情标题','open':true}">
+    <tr>
+      <th width="80" align="right"><i>开始时间</i></th>
+      <td><span id="starttime"/></td>
+    </tr>
+    <tr>
+      <th align="right"><i>结束时间</i></th>
+      <td><span id="endtime"/></td>
+    </tr>
+    <tr>
+      <th align="right"><i>开发语言</i></th>
+      <td><span id="kaifa"/></td>
+    </tr>
+    <tr>
+      <th align="right"><i>开发部门</i></th>
+      <td><span id="language"/></td>
+    </tr>
+    </table>
+    
+     <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" data-option="{'title':'人员标题','open':false}">
+    <tr>
+      <th width="80" align="right"><i>姓名</i></th>
+      <td><span id="name"/></td>
+    </tr>
+    <tr>
+      <th align="right"><i>证件类型</i></th>
+      <td><span id="cardtype"/></td>
+    </tr>
+    <tr>
+      <th align="right"><i>身份证</i></th>
+      <td><span id="idno"/></td>
+    </tr>
+    <tr>
+      <th align="right"><em>录入人</em></th>
+      <td><span id="user"/></td>
+    </tr>
+    </table>
+    
+     <table width="100%" border="3" cellspacing="0" cellpadding="0"  class="formtab" data-option="{'title':'附件标题','open':false}">
+    <tr>
+      <th width="80" align="right"><em>上传</em></th>
+      <td valign="top"><div class="fm_uploadPicsShow uppicbox" data-option="{'rel':'pics'}"></div>
+        <span id="pics"  /></td>
+    </tr>
+    <tr>
+      <th align="right"><em>上传</em></th>
+      <td><div class="fm_uploadFilesShow upfilebox" data-option="{'rel':'files'}"></div>
+        <span id="files"/></td>
+    </tr>
+    <tr>
+      <th align="right">上传</th>
+      <td><div class="fm_uploadFilesShow upfilebox" data-option="{'rel':'blankfiles'}"></div>
+        <span id="blankfiles" /></td>
+    </tr>
+    <tr>
+      <th align="right"><em>上传</em></th>
+      <td><div class="fm_uploadPicsShow uppicbox" data-option="{'rel':'blankpics'}"></div>
+        <span id="blankpics" /></td>
+    </tr>
+  </table>
+  </div>
+</div>
+<!--提交按钮-->
+<div class="submitButs"> <a  id="cancelButton" class="but-normal but-greenlight"> <i class="fa fa-reply"></i> 返回</a></div>
+<!--内容部分end--> 
+

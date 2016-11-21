@@ -1,0 +1,53 @@
+/*.contentContainer.maindesktop {
+	background-image: url(../images/global-bg.jpg);
+	background-repeat: no-repeat;
+	background-position: center center;
+	background-size: 100% 100%;
+}*/
+
+.topBox h1 {
+	font-size: 20px;
+	font-weight: normal;
+	line-height: 50px;
+/*	color: #333;*/
+	margin: 0px;
+	padding-top: 0px;
+	padding-right: 0px;
+	padding-bottom: 0px;
+	padding-left: 20px;
+/*	text-shadow: 0px 0px 3px #003333;
+	background-image: url(../../images/logo.png);
+	background-repeat: no-repeat;
+	background-position: -2px center;
+	background-size: auto 48px;*/
+}
+.topBox {
+
+
+}
+
+.icon0 {
+	background-image: url(../images/qx01.png);
+}
+.icon1 {
+	background-image: url(../images/qx02.png);
+}
+.icon2 {
+	background-image: url(../images/qx03.png);
+}
+.icon3 {
+	background-image: url(../images/qx04.png);
+}
+.icon4 {
+	background-image: url(../images/qx05.png);
+}
+.icon5 {
+	background-image: url(../images/qx06.png);
+}
+
+.icon6 {
+	background-image: url(../images/qx05.png);
+}
+.icon7 {
+	background-image: url(../images/qx06.png);
+}

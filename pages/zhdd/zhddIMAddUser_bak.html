@@ -1,0 +1,370 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	var TABBox;
+    var TABBoxFlag="1";
+	var Tree;
+    var SearchForm;
+    var SearchFormGroup;
+    var BoxClassName="selectTreeBox";
+    var onCheckFlag= false;
+    var tempGroupName="";
+    var groupid="";
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		if(TABBox){
+			TABBox.resize();
+		}
+	}
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){  
+                groupid=p.CONDITION.groupid;
+                //p.find("#groupName").val(p.CONDITION.groupName);
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);
+                //表单处理
+		SearchForm=new formDeal(p.find("#searchForm"));
+		SearchForm.parse();
+		SearchForm.bindData(p.CONDITION);//绑定默认条件
+                SearchFormGroup=new formDeal(p.find("#searchFormGroup"));
+		SearchFormGroup.parse();
+		SearchFormGroup.bindData(p.CONDITION);//绑定默认条件
+		//安装树选择,异步加载树
+		var treeOptions={
+		  "url":"php/communication/GetContacts_web.php",
+		  "queryParams":{"event":"FormEdit","content":{"condition":{"orgCode":userData.orgCode}},"extend":{}},		  
+		  "onlyLeafCheck":false, //只选叶子
+		  "cascadeCheck":true, //级联检查
+		  "method":"post",
+                  "animate":true,
+                  "checkbox":true,
+                  "onCheck":treeOnSelect,
+                  "onLoadSuccess":treeOnLoadSuccess,
+		  "onBeforeLoad":function(node,param){ //加载分支前附加参数
+                         
+			  if(node){
+			 	 param.content.condition.orgCode=node.id;
+                                 param.content.condition.id=node.id;
+                                 //alert(JSON.stringify(param));
+			  }
+		  },
+		  "loadFilter":myLoadFilter
+		}
+               
+		p.find(".selectTreeBox").tree(treeOptions);
+        treeOptions.url="php/communication/GetGroups_web.php";
+        p.find(".selectTreeBoxCar").tree(treeOptions);
+		
+		
+		//安装TAB组件	(tab标签容器,对应标签的内容容器)
+		TABBox=new Tabs(p.find(".fm_tabBox"),p.find("#tabcont"));
+		$(TABBox).bind("TAB_CLICK",function(e,Vars){ //绑定tab标签点击事件	
+			var option=Vars["tabItem"].getDataOptions();//获得按钮参数
+            TABBoxFlag=option.type;
+            if(option.type=="1")
+            {
+                BoxClassName="selectTreeBox";
+                p.find("#selectWraper").show();
+                p.find("#selectWraperCar").hide();
+                p.find(".searchBoxGroup").show();
+               
+            }
+             if(option.type=="2")
+            {
+                BoxClassName="selectTreeBoxCar";
+                p.find("#selectWraperCar").show();
+                p.find("#selectWraper").hide();                   
+                p.find(".searchBoxGroup").show();
+            }
+		}).bind("TAB_RESIZE",function(e,size){ //绑定tab布局resize事件
+                        
+                        p.find(".selectWraper").setRealSize(size.width,size.h-70);
+                        p.find(".selectTreeBox").setRealSize(size.width,size.h-70);
+                        p.find(".selectWraperCar").setRealSize(size.width,size.h-70);
+                        p.find(".selectTreeBoxCar").setRealSize(size.width,size.h-70);
+		})
+		
+		//更新一下尺寸，注意执行时间点，一般放在最后
+		p.resize();	
+      	p.find("#selectWraperCar").hide();              
+        p.find("#searchButton").bind("click",SearchButtonClick);
+		p.find("#resetButton").bind("click",ResetButtonClick);
+        p.find("#GroupAddUser").bind("click",groupAddUserClick);
+                
+	}
+	function groupAddUserClick()
+        {
+            p.find("#GroupAddUser").unbind("click",groupAddUserClick);
+            var ren = "";
+            var che = "";
+            var nodes = p.find('.selectTreeBox').tree('getChecked');
+            
+            for(var i=0;i<nodes.length;i++)
+            {
+                if(p.find(".selectTreeBox").tree('isLeaf',nodes[i].target))
+                {
+                    ren+=nodes[i].id+",";
+                }
+            }
+            if(ren.length>0)
+            {
+               ren=ren.substring(0,ren.length-1);
+            }
+            var nodes =  p.find('.selectTreeBoxCar').tree('getChecked');
+           
+            for(var i=0;i<nodes.length;i++)
+            {
+                 if(p.find(".selectTreeBox").tree('isLeaf',nodes[i].target))
+                {
+                    che+=nodes[i].id+",";
+                }
+            }
+            if(che.length>0)
+            {
+               che=che.substring(0,che.length-1);
+            }
+            var condition={
+				qzmc:p.CONDITION.groupName,
+				cjrId:userData.userId,
+				qzcy:ren,
+				gids:che,
+                groupid:groupid
+				
+		};
+			if(ren.length>0||che.length>0){
+	       		 WEBCHAT.addUserlist(condition,groupid);
+	       		 WINDOW.close(p.WINID);
+	        }else{
+	       		 $.message("请选择一个人员!");
+	        }
+        }
+	function SearchButtonClick(){
+		var formData=SearchForm.getData();
+		var flag = true;
+		p.find("#resetButton").unbind("click",ResetButtonClick);
+		p.find("#searchButton").unbind("click",SearchButtonClick);
+        var nodes;
+        
+        if(TABBoxFlag=="1")
+        {
+            BoxClassName="selectTreeBox";
+        }
+        else if(TABBoxFlag=="2")
+        {
+             BoxClassName="selectTreeBoxCar";
+        }
+        else
+        {
+            return;
+        }
+        nodes  = p.find('.'+BoxClassName).tree('getRoots');
+        var orgName = formData.orgName;
+        for(var i=0;i<nodes.length;i++)
+        {
+           if(nodes[i].text.length>0&&orgName.length>0&&nodes[i].text.indexOf(orgName)>-1)
+           {
+               p.find('.'+BoxClassName).tree('expand',nodes[i].target);
+               if(flag)
+               {    
+                   p.find('.'+BoxClassName).scrollTo(nodes[i].target,300,{axis:'y'});
+                   flag = false;
+               }
+           }
+        }
+		p.find("#resetButton").bind("click",ResetButtonClick);
+		p.find("#searchButton").bind("click",SearchButtonClick);
+		
+		
+	}
+	
+	function ResetButtonClick(){
+		//清空状态和部门的值
+		//p.find("#orgCode").val("");
+		//p.find("#orgCode_text").val("");
+          p.find("#orgName").val("");
+		
+			
+	}
+	function treeOnSelect(node,checked)
+        {
+           
+            if(!p.find("."+BoxClassName).tree('isLeaf',node.target))
+            {
+                if(checked)
+                {
+                    if(node.state=='closed')
+                    {
+                    p.find("."+BoxClassName).tree('expand',node.target);
+                    onCheckFlag = true;
+                    }
+                    if(node.state=='open')
+                    {
+                        var nodes = p.find("."+BoxClassName).tree('getChildren',node.target); 
+                        var rootNode = p.find("."+BoxClassName).tree('getRoot');
+                        if(node.id==rootNode.id)
+                        {
+                             for(var i=0;i<nodes.length;i++)
+                            {
+                              p.find("."+BoxClassName).tree("check",nodes[i].target);
+                            }
+                        }
+                    }
+                }
+            }
+           
+        }
+        function treeOnLoadSuccess(node,data)
+        {
+            
+           if(node!=null&&onCheckFlag)
+           {
+             p.find("."+BoxClassName).tree('check',node.target); 
+             onCheckFlag=false;
+           }
+          
+        }
+    
+        //异步树过滤器
+       function myLoadFilter(data, parent){
+			data=formatHostJson(data);//全局过滤
+			
+			var state = $.data(this, 'tree');
+			
+		    function setData(){
+		    	var serno = 1;
+		        var todo = [];
+		        for(var i=0; i<data.length; i++){
+		            todo.push(data[i]);
+		        }
+		        while(todo.length){
+		            var node = todo.shift();
+		            if (node.id == undefined){
+		            	node.id = '_node_' + (serno++);
+		            }
+		            if (node.children){
+		                node.state = 'closed';
+		                node.children1 = node.children;
+		                node.children = undefined;
+		                todo = todo.concat(node.children1);
+		            }
+		        }
+		        state.tdata = data;
+		    }
+			
+		    function find(id){
+		    	var data = state.tdata; 
+		    	var cc = [data];
+		    	while(cc.length){
+		    		var c = cc.shift();
+		    		for(var i=0; i<c.length; i++){
+		    			var node = c[i]; 
+		    			if (node.id == id){
+		    				return node;
+		    			} else if (node.children1){
+		    				cc.push(node.children1);
+		    			}
+		    		}
+		    	}
+		    	return null;
+		    }
+		    
+		    setData();
+		    
+		    var t = $(this);
+		    var opts = t.tree('options');
+		    opts.onBeforeExpand = function(node){
+	    		var n = find(node.id);
+                        if(n==null)
+                        {
+                            return;
+                        }
+	    		if (n.children && n.children.length){return}
+		    	if (n.children1){
+		    		var filter = opts.loadFilter;
+		    		opts.loadFilter = function(data){return data;};
+		    		t.tree('append',{
+		    			parent:node.target,
+		    			data:n.children1
+		    		});
+		    		opts.loadFilter = filter;
+		    		n.children = n.children1;
+		    	}
+		    };
+			return data;
+		}
+}
+</script>
+
+<!--内容部分start-->
+<!--tab标签-->
+<div class="fm_tabBox"
+	data-option="{'position':'top','width':120,'default':0}">
+	<a data-option="{'type':'1'}">部门组</a><a data-option="{'type':'2'}">巡逻组</a>
+</div>
+
+<!--表格-->
+<div class="datalist" id="tabcont">
+	<div class="searchBox" style="height: 30px">
+		<form id="searchForm">
+			<table border="0" cellspacing="0" cellpadding="3">
+				<tr>
+					<td>
+						<i>部门:</i>
+					</td>
+					<td>
+						<input type="text" name="orgName" style="width: 120px"
+							id="orgName" />
+
+					</td>
+
+					<td width="100" align="right" valign="top">
+						<a id="searchButton" class="but-small but-red"><i
+							class="fa fa-search"></i> 查询</a>
+					</td>
+					<td valign="top">
+						<a id="resetButton" class="but-small but-blue"><i
+							class="fa fa-search"></i> 重置</a>
+					</td>
+				</tr>
+			</table>
+		</form>
+	</div>
+	<div class="selectWraper" style="position: relative; width: 100%;"
+		id="selectWraper">
+
+		<div class="selectTreeBox"
+			style="position: absolute; left: 0px; top: 0px; width: 100%; overflow-y: auto">
+			正在加载数据...
+		</div>
+	</div>
+	<div class="selectWraperCar" style="position: relative; width: 100%"
+		id="selectWraperCar">
+		<div class="selectTreeBoxCar"
+			style="position: absolute; left: 0px; top: 0px; width: 100%; overflow-y: auto"></div>
+	</div>
+	<div class="searchBoxGroup" style="height: 30px">
+		<form id="searchFormGroup">
+			<table border="0" cellspacing="0" cellpadding="3">
+				<tr>
+					<td valign="top">
+						<a id="GroupAddUser" class="but-small but-red"><i
+							class="fa fa-user-plus"></i> 添加</a>
+					</td>
+				</tr>
+			</table>
+		</form>
+	</div>
+</div>
+<!--内容部分end-->
+
+
+
+
