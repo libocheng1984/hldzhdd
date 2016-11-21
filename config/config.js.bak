@@ -21,7 +21,7 @@ var useCache=!DEBUG;                                                    //true;/
 var cacheFrame=!DEBUG;                                                //true;//false;//是否使用缓存框架 js
 var msgSound=framePos+"frame/msg.mp3";                 //消息提示音
 var powerDataFlag="allow";                                            //校验权限标记和数据id,没有不校验
-var keepFormBlank=false;                                               //保留提交表单的空值，铁路用
+var keepFormBlank=true;                                               //保留提交表单的空值，铁路用
 
 //微信配置----------
 var chatOption={

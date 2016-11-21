@@ -61,7 +61,7 @@ function OlMap(){
 
 		var wmts1 = new OpenLayers.Layer.WMTS({
 			name: "底图一",
-			url: "http://10.78.17.161:6160/WMTSServer.ashx",
+			url: "http://10.78.17.200:6160/WMTSServer.ashx",
             layer: "LNDTL",
 	        matrixSet: "EPSG:4490",
 	        //matrixIds: ['EPSG:4490_LNDTL01:0','EPSG:4490_LNDTL01:1','EPSG:4490_LNDTL01:2','EPSG:4490_LNDTL01:3','EPSG:4490_LNDTL01:4'],

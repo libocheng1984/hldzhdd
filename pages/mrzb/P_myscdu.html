@@ -1,0 +1,53 @@
+<script type="text/javascript">
+function ACTION(){
+	var p=this;	
+	var LINSHI;
+		
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){
+		p.find(".detailBox").height(p.WRAPER.height());
+		p.find(".fm_datePointSelector").fillParent();
+		LINSHI?LINSHI.resize():null;
+	}		
+	
+	this.DESTROY=function(){ 
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){  
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);			
+		LINSHI=new paibanActionPoint(p.find(".fm_datePointSelector"));	
+		p.resize();	
+		getFormData();					
+	}	
+	
+	//获取数据
+	function getFormData(){
+		var Loader=new AJAXObj();
+		$(Loader).bind("JSON_LOADED",function(e,backJson){			
+			//排班规则
+                        
+			var paibanVal=backJson["value"]["PAIBANGUIZHE"];
+                     
+			LINSHI.updateAllDate(paibanVal);	
+			//临时排班
+			var LinshiPaibanVal=backJson["value"]["LINSHIPAIBAN"];   
+			LINSHI.setDefultValue(LinshiPaibanVal);								
+		})
+		Loader.POSTDATA("php/mrzb/Paiban.php",{"event":"GET_PAIBAN","content":{"condition":p.CONDITION},"extend":{}});				
+	}
+}
+</script>
+<!--内容部分start-->
+<!--表单-->
+<style type="text/css">
+.myworkscd .normalworkIcon.workIcon.onwork {
+	background-color: #F90;
+	color: #FFF;
+}
+</style>
+<div class="detailBox">
+    <div class="fm_datePointSelector disSelected myworkscd" data-option="{'afterMonth':6,'beforeMonth':2,'editable':false}"></div>
+</div>
+<!--内容部分end--> 

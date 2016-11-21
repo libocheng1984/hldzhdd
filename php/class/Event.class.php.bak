@@ -155,8 +155,8 @@ MDSYS.Sdo_Util.to_wktgeometry_varchar(t.jqjqzb),t.rksj,t.gxsj,t.cfjqbs,t.jqclzt,
 			$sql = $sql . " and rec . jjrbh ='$jjrbh' ";
 		}
 		$sql = $sql . " order by t.gxsj desc";
-		//echo $sql;
-		//return;
+		echo $sql;
+		return;
 		$stmt = oci_parse($this->dbconn, $sql);
 
 		if (!@ oci_execute($stmt)) {
@@ -1224,7 +1224,7 @@ MDSYS.Sdo_Util.to_wktgeometry_varchar(t.jqjqzb),t.rksj,t.gxsj,t.cfjqbs,t.jqclzt,
 			$this->dbconn = $this->LogonDB();
 
 		$sql = "select t.zylx,t.zydz,t.cjdbh,t.zlbh,t1.jqcljg from ZDT_PeProcess_Resource t left join ZDT_PeFeedback_Case t1 on t.cjdbh=t1.cjdbh where t.cjdbh='$cjdbh' and t.zlbh='$zlbh'";
-		echo $sql;
+		//echo $sql;
 		$stmt = oci_parse($this->dbconn, $sql);
 
 		if (!@ oci_execute($stmt)) {

@@ -51,7 +51,7 @@ function InstallMap(){
     <div class="contentContainer"></div>
   </div>
   <div class="pagebox  mapcontainer">
-    <div class="contentContainer">
+    <div class="contentContainer" style="padding: 0px">
       <div class="relpos maptoolbox"> 
         <!--地图按钮-->
         <div class="maptools fm_outerPage" data-option="{'name':'MapTools','url':'pages/maptools.html'}"></div>

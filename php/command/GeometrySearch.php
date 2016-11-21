@@ -56,6 +56,7 @@
 	}
 	
 	$params = $AddressName.$mp.$sc.$th;
+	
 	if(!sqlInjectValidation($params)){
 		$arr = array (
 				'head' => array (
@@ -72,8 +73,9 @@
 	if ($operation=="FullTextRetrieval_GetPointInfoByAddressName_v001") {
 		if($AddressName!=""){
 			$AddressName = urlencode($AddressName);
-			$url = 'http://10.78.17.154:9999/lbs?operation='.$operation.'&license=' . $license . '&content={"data":[{"AddressName":"'.$AddressName. '"}],"pageindex":0,"pagesize":200}';
+			$url = 'http://192.168.20.215:9999/lbs?operation='.$operation.'&license=' . $license . '&content={"data":[{"AddressName":"'.$AddressName. '"}],"pageindex":0,"pagesize":200}';
 			$roleInfo = file_get_contents($url);
+			//echo $url;
 			$result = json_decode($roleInfo, true);
 			$resultInfo = array (
 				'head' => array (
@@ -100,8 +102,8 @@
 			$mp = urlencode($mp);
 			$sc = urlencode($sc);
 			$th = urlencode($th);
-			$url = 'http://10.78.17.154:9999/lbs?operation='.$operation.'&license=' . $license . '&content={"data":[{"Km":"0","mp":"'.$mp.'","sc":"' . $sc .'","th":"' . $th . '"}],"pageindex":0,"pagesize":200}';
-			//echo $url;
+			$url = 'http://192.168.20.215:9999/lbs?operation='.$operation.'&license=' . $license . '&content={"data":[{"Km":"0","mp":"'.$mp.'","sc":"' . $sc .'","th":"' . $th . '"}],"pageindex":0,"pagesize":200}';
+			echo $url;
 			$roleInfo = file_get_contents($url);
 			$result = json_decode($roleInfo, true);
 			$resultInfo = array (

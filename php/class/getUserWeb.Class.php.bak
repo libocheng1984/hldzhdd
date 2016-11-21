@@ -1,0 +1,248 @@
+<?php
+
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+/**
+ * Description of getUserWeb
+ *
+ * @author Administrator
+ */
+class getUserWeb  extends TpmsDB  {
+    public function getUserList($orgCode,$userid,$username,$page,$rows){
+		$bRet = true;
+		$errMsg = "";
+		$row_count=0;
+		$result = array('result' =>false,'errmsg' =>'','records' => '');
+		$datas = array();
+		$arr=array('total'=>0,'rows' => $datas);
+		if ($this->dbconn == null)
+			$this->dbconn = $this->LogonDB();
+
+		 /*组成sql*/
+		$sql = "select count(*) ROWCOUNT from zdb_user t left join zdb_organization t2 on t.bz=t2.orgcode where 1=1 ";
+                //select t.userid,t.username,t.alarm,t2.orgcode,t2.orgname from zdb_user t left join org_organization t2 on t.bz=t2.orgcode where t.userid='' and t.username='' and (t2.orgcode='' or t2.parenttreepath like '%%') 
+		
+		if ($userid != null) {
+			$sql = $sql . " and t.userid='$userid'";
+		}
+               if ($username != null) {
+			$sql = $sql . " and t.username like '%$username%'";
+		}
+                if ($orgCode != null) {
+			$sql = $sql . " and (t2.orgcode='$orgCode' or t2.parenttreepath like '%$orgCode%') ";
+		}
+		$sql = $sql . " order by t.xt_zhxgsj desc";
+		
+	    //echo $sql;
+		$stmt = oci_parse($this->dbconn, $sql);
+		oci_define_by_name($stmt,"ROWCOUNT",$row_count);
+		if (!@oci_execute($stmt)) {
+	  		$bRet = false;
+	  		$errMsg="查询失败";
+		}else{
+			
+		 /*处理分页*/
+			oci_fetch($stmt);
+			$total_rec = $row_count;
+			oci_free_statement($stmt);
+    	
+			/*查询*/
+			if ($this->dbconn == null)
+			$this->dbconn = $this->LogonDB();
+                        $sql=str_replace("select count(*) ROWCOUNT","select t.userid,t.username,t.alarm,t2.orgcode,t2.orgname,t.id  ",$sql);
+			
+                        //echo $sql;
+			$sql = pageResultSet($sql, $page, $rows);
+			
+			$stmt = oci_parse($this->dbconn, $sql);
+			if (!@oci_execute($stmt)) {
+				$bRet = false;
+				$errMsg="查询失败";
+			}else{
+				while (($row = oci_fetch_assoc($stmt)) != false) {
+					$data = array(
+						'userid' => iconv("GBK", "UTF-8", $row["USERID"]),
+						'username' => iconv("GBK", "UTF-8", $row["USERNAME"]),
+						'alarm' => iconv("GBK", "UTF-8", $row["ALARM"]),
+						'orgcode' => iconv("GBK", "UTF-8", $row["ORGCODE"]),
+                                                'id' => iconv("GBK", "UTF-8", $row["ID"]),
+						'orgname' => iconv("GBK", "UTF-8", $row["ORGNAME"])
+						
+       				);
+		   			array_push($datas, $data);
+	  		}
+	  			oci_free_statement($stmt);
+	  			oci_close($this->dbconn);
+				$arr=array('total'=>$total_rec,'rows' => $datas);
+			}
+		}
+		$result = array('result' =>$bRet,'errmsg' =>$errMsg,'records' => $arr);
+		return $result;
+	}
+        public function getUserById($Id) {
+		$bRet = true;
+		$errMsg = "";
+		$data = array();
+		if ($this->dbconn == null)
+			$this->dbconn = $this->LogonDB();
+
+		$sql = "select t.userid,t.username,t.alarm,t2.orgcode,t2.orgname,t.id from zdb_user t left join zdb_organization t2 on t.bz=t2.orgcode where t.id='$Id'";
+		//echo $sql;
+		$stmt = oci_parse($this->dbconn, $sql);
+
+		if (!@ oci_execute($stmt)) {
+			$bRet = false;
+			echo getOciError($stmt);
+			oci_close($this->dbconn);
+			$errMsg = '查询失败';
+		} else {
+			if (($row = oci_fetch_assoc($stmt)) != false) {
+				$data = array (
+                                                'userid' => iconv("GBK", "UTF-8", $row["USERID"]),
+						'username' => iconv("GBK", "UTF-8", $row["USERNAME"]),
+						'alarm' => iconv("GBK", "UTF-8", $row["ALARM"]),
+						'parentOrgCode' => iconv("GBK", "UTF-8", $row["ORGCODE"]),
+                                                'id' => iconv("GBK", "UTF-8", $row["ID"]),
+						'parentOrgCode_text' => iconv("GBK", "UTF-8", $row["ORGNAME"])
+				);
+			}
+		}
+		oci_free_statement($stmt);
+		oci_close($this->dbconn);
+
+		return $data;
+	}
+     public function getOrgList($orgname,$page,$rows,$orgCode){
+		$bRet = true;
+		$errMsg = "";
+		$row_count=0;
+		$result = array('result' =>false,'errmsg' =>'','records' => '');
+		$datas = array();
+		$arr=array('total'=>0,'rows' => $datas);
+		if ($this->dbconn == null)
+			$this->dbconn = $this->LogonDB();
+
+		 /*组成sql*/
+		$sql = "select count(*) ROWCOUNT from ZDB_ORGANIZATION where  orgname like '%$orgname%' ";
+                //select ID,orgcode,orgname from ORG_ORGANIZATION where orgname like '%%'
+		if ($orgCode != null) {
+			$sql = $sql . " and (orgcode='$orgCode' or parenttreepath like '%$orgCode%') ";
+		}
+		
+		$sql = $sql . " order by orgcode";
+		
+	        echo $sql;
+		$stmt = oci_parse($this->dbconn, $sql);
+		oci_define_by_name($stmt,"ROWCOUNT",$row_count);
+		if (!@oci_execute($stmt)) {
+	  		$bRet = false;
+	  		$errMsg="查询失败";
+		}else{
+			
+		 /*处理分页*/
+			oci_fetch($stmt);
+			$total_rec = $row_count;
+			oci_free_statement($stmt);
+    	
+			/*查询*/
+			if ($this->dbconn == null)
+			$this->dbconn = $this->LogonDB();
+                        $sql=str_replace("select count(*) ROWCOUNT","select ID,orgcode,orgname ",$sql);
+			
+                        //echo $sql;
+			$sql = pageResultSet($sql, $page, $rows);
+			
+			$stmt = oci_parse($this->dbconn, $sql);
+			if (!@oci_execute($stmt)) {
+				$bRet = false;
+				$errMsg="查询失败";
+			}else{
+				while (($row = oci_fetch_assoc($stmt)) != false) {
+					$data = array(
+						'id' => iconv("GBK", "UTF-8", $row["ID"]),
+						'orgcode' => iconv("GBK", "UTF-8", $row["ORGCODE"]),
+						'orgname' => iconv("GBK", "UTF-8", $row["ORGNAME"])
+						
+       				);
+		   			array_push($datas, $data);
+	  		}
+	  			oci_free_statement($stmt);
+	  			oci_close($this->dbconn);
+				$arr=array('total'=>$total_rec,'rows' => $datas);
+			}
+		}
+		$result = array('result' =>$bRet,'errmsg' =>$errMsg,'records' => $arr);
+		return $result;
+	}
+        public function getOrgById($Id) {
+		$bRet = true;
+		$errMsg = "";
+		$data = array();
+		if ($this->dbconn == null)
+			$this->dbconn = $this->LogonDB();
+
+		$sql = "select a.ID,a.orgcode,a.orgname,a.parentcode,b.orgname parentName  from (select id,orgcode,orgname,substr(parenttreepath,instr(parenttreepath,'_',-1,2)+1,12) parentcode from zdb_organization) a left join zdb_organization b on a.parentcode=b.orgcode where a.id='$Id'";
+		//echo $sql;
+		$stmt = oci_parse($this->dbconn, $sql);
+
+		if (!@ oci_execute($stmt)) {
+			$bRet = false;
+			echo getOciError($stmt);
+			oci_close($this->dbconn);
+			$errMsg = '查询失败';
+		} else {
+			if (($row = oci_fetch_assoc($stmt)) != false) {
+				$data = array (
+                                             'id' => iconv("GBK", "UTF-8", $row["ID"]),
+						'orgcode' => iconv("GBK", "UTF-8", $row["ORGCODE"]),
+                                                'parentOrgCode' => iconv("GBK", "UTF-8", $row["PARENTCODE"]),
+                                                'parentOrgCode_text' => iconv("GBK", "UTF-8", $row["PARENTNAME"]),
+						'orgname' => iconv("GBK", "UTF-8", $row["ORGNAME"])
+				);
+			}
+		}
+		oci_free_statement($stmt);
+		oci_close($this->dbconn);
+
+		return $data;
+	}
+        //
+        public function updateParentOrg($id,$parentOrgCode){
+		$bRet = true;
+		$errMsg = '';
+		if ($this->dbconn == null)
+		$this->dbconn = $this->LogonDB();
+			
+			$sql = "update zdb_organization t set t.parenttreepath = (select parenttreepath||orgcode||'_' from zdb_organization t2 where orgcode='$parentOrgCode') where id='$id'";
+		//echo $sql;
+		$stmt = oci_parse($this->dbconn, $sql);
+		if (!@ oci_execute($stmt)) {
+			$bRet = false;
+			$errMsg = '修改失败';
+		}
+		oci_free_statement($stmt);
+		oci_close($this->dbconn);
+		return $bRet;
+	}
+         public function updateUserOrg($id,$orgCode){
+		$bRet = true;
+		$errMsg = '';
+		if ($this->dbconn == null)
+		$this->dbconn = $this->LogonDB();
+			
+			$sql = "update zdb_user set bz='$orgCode' where id='$id'";
+		//echo $sql;
+		$stmt = oci_parse($this->dbconn, $sql);
+		if (!@ oci_execute($stmt)) {
+			$bRet = false;
+			$errMsg = '修改失败';
+		}
+		oci_free_statement($stmt);
+		oci_close($this->dbconn);
+		return $bRet;
+	}
+}

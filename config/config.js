@@ -23,26 +23,12 @@ var msgSound=framePos+"frame/msg.mp3";                 //消息提示音
 var powerDataFlag="allow";                                            //校验权限标记和数据id,没有不校验
 var keepFormBlank=true;                                               //保留提交表单的空值，铁路用
 
-//微信配置----------
-var chatOption={
-	"title":"警务通讯",
-	"listener":"http", //push/http 消息获得方式
-	"timer":3000,//http方式间隔时间
-	"uploadurl":"php/communication/sendFile_web.php",//图片上传接口
-	"hostPort":"php/communication/ImService_web.php",//服务接口
-	"groupPort":"php/communication/GetMsgGroups_web.php",//组列表接口
-	"detailPort":"php/communication/GetSimpleById.php",//警情接口
-	"detailTemplete":"pages/jingqing.html",//警情模板
-	"alarmSound":"JsLib/sound/msg.mp3",//消息提醒声音
-	"topic":"/topic/stock",
-	"userName":"",
-	"timeout":300000,
-	"password":"",
-};
+
 
 //插件扩展---------
 var pluginJS=[
-	 host+"paibanbiao.js"
+	 host+"paibanbiao.js",
+	 {"url":framePos+"webChat/webChat.js","cache":true}, //微信
 ];//附加的js插件url
 var pluginCSS=[
 	"style/style.css",

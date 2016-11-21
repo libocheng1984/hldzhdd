@@ -116,7 +116,7 @@ class getUserWeb  extends TpmsDB  {
 
 		return $data;
 	}
-     public function getOrgList($orgname,$page,$rows){
+     public function getOrgList($orgname,$page,$rows,$orgCode){
 		$bRet = true;
 		$errMsg = "";
 		$row_count=0;
@@ -127,13 +127,15 @@ class getUserWeb  extends TpmsDB  {
 			$this->dbconn = $this->LogonDB();
 
 		 /*组成sql*/
-		$sql = "select count(*) ROWCOUNT from ZDB_ORGANIZATION where orgname like '%$orgname%' ";
+		$sql = "select count(*) ROWCOUNT from ZDB_ORGANIZATION where  orgname like '%$orgname%' ";
                 //select ID,orgcode,orgname from ORG_ORGANIZATION where orgname like '%%'
-		
+		if ($orgCode != null) {
+			$sql = $sql . " and (orgcode='$orgCode' or parenttreepath like '%$orgCode%') ";
+		}
 		
 		$sql = $sql . " order by orgcode";
 		
-	        //echo $sql;
+	   //     echo $sql;
 		$stmt = oci_parse($this->dbconn, $sql);
 		oci_define_by_name($stmt,"ROWCOUNT",$row_count);
 		if (!@oci_execute($stmt)) {

@@ -1,0 +1,43 @@
+<script type="text/javascript">
+function ACTION(){
+	var p=this;		
+	var chatOption={
+		"title":"警务通讯",
+//		"listener":"socket_http",
+//		"socketHost":"192.168.0.29",//"127.0.0.1",//服务地址
+//		"socketPort":9001, //9193 //服务端口
+		
+		"listener":"http", //push/http/socket_http 消息获得方式
+		"timer":3000,//http方式间隔时间
+		"uploadurl":"php/communication/sendFile_web.php",//图片上传接口
+		"hostPort":"php/communication/ImService_web.php",//服务接口
+		"groupPort":"php/communication/GetMsgGroups_web.php",//组列表接口
+		"detailPort":"php/communication/GetSimpleById.php",//警情接口
+		"detailTemplete":"pages/jingqing.html",//警情模板
+		"alarmSound":"JsLib/sound/msg.mp3",//消息提醒声音
+		"height":600,
+		"timeout":60000	
+	};
+	
+	//卸载时销毁方法
+	this.DESTROY=function(){ 
+		
+	}
+	
+	//加载后执行
+	this.READY=function(){
+		WEBCHAT=new webChat(chatOption);
+		WEBCHAT.install();
+//		$(WEBCHAT).bind("CHAT_ADDUSER",addUser);//添加用户事件监听
+//		$(WEBCHAT).bind("CHAT_NEW_MSG",showNewMsg);//添加用户事件监听
+		var zindex=WEBCHAT.option["zindex"]+1;
+		var Player=new playFlvVideo((swfPath||framePos+"frame/"),zindex);//swf文件位置相对当前页的
+		$(WEBCHAT).bind("CHAT_VIDEO",function(e,video){ 
+			Player.play(video["url"],video["butobj"]);
+		}).bind("CHAT_VOICE",function(e,sound){  
+			//声音播放	
+			var Mp3Player=new PlaySound(sound["url"],true,framePos);
+		})
+	}	
+}
+</script>

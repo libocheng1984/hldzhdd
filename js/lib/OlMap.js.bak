@@ -21,7 +21,7 @@ function OlMap(){
 			maxExtent: new OpenLayers.Bounds(72.85,2.77,135,54), /*设置地图范围*/
 			//maxResolution: 0.0027465763646684995,
 			maxResolution: 0.0878904492194737,
-			numZoomLevels: 17, /*设置图层名称*/
+			numZoomLevels: 16, /*设置图层名称*/
 			projection: "EPSG:4326",
 			units: "dd"
 		};

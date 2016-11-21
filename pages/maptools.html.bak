@@ -1163,7 +1163,7 @@ function ACTION(){
 					}
 							
 				})
-				Loader.POSTDATA("php/layer/ManageRegion.php",{"event":"Feature","content":{"condition":params},"extend":{}});
+				Loader.POSTDATA("php/layer/ManageRegionOra.php",{"event":"Feature","content":{"condition":params},"extend":{}});
 			}
 
 		});
@@ -1217,7 +1217,7 @@ function ACTION(){
 				}
 						
 			})
-			Loader.POSTDATA("php/layer/ManageRegion.php",{"event":"Feature","content":{"condition":params},"extend":{}});
+			Loader.POSTDATA("php/layer/ManageRegionOra.php",{"event":"Feature","content":{"condition":params},"extend":{}});
 		});
 
 		 mrHtml.find("#searchButton").unbind();

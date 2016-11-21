@@ -5,7 +5,7 @@ function ACTION(){
 	var mainMenu;
 	
 	this.READY=function(){
-		var menuOption={"noCenterBlank":true,"iconAlign":"right","top":"7px","left":"0px","bottom":"","right":"27px","expdir":"top","width":36,"height":36};
+		var menuOption={"showTitle":false,"noCenterBlank":true,"iconAlign":"right","top":"7px","left":"0px","bottom":"","right":"27px","expdir":"top","width":36,"height":36};
 		mainMenu=new DeskMenu(p.find(".mainmenu_topright"),101,menuOption);
 		mainMenu.loadMenu("php/system/GetRole_web.php");
 		$(mainMenu).bind("MENU_CLICK",function(e,Vars){

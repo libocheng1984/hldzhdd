@@ -30,8 +30,9 @@
 	$event = isset ($_REQUEST['event']) ? $_REQUEST['event'] : "";
 	$content = isset ($_REQUEST['content']) ? $_REQUEST['content'] : "";
 	$extend = isset ($_REQUEST['extend']) ? $_REQUEST['extend'] : "";
-        $page = isset($_REQUEST['page'])?$_REQUEST['page'] : "1";
+  $page = isset($_REQUEST['page'])?$_REQUEST['page'] : "1";
 	$rows = isset($_REQUEST['rows'])?$_REQUEST['rows'] : "10";
+	$orgOcode = isset($_SESSION["orgCode"])?$_SESSION["orgCode"] : "";
 	//$content = Json_decode($content, true);
 	$orgname="";
 	if(isset($content['condition'])){
@@ -45,7 +46,7 @@
 	
 		
 	$getUserWeb = new getUserWeb();//创建调度类实例
-	$res = $getUserWeb->getOrgList($orgname, $page, $rows);//调用实例方法
+	$res = $getUserWeb->getOrgList($orgname, $page, $rows,$orgOcode);//调用实例方法
 	$code = $res['result']==true?1:0;
 	$result = array (
 				'head' => array (

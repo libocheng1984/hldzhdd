@@ -229,6 +229,11 @@ function paibanActionPoint(container){
 		var Datetds=calander.findAllDateTd(); 
 		Datetds.removeClass("UserSelected").removeClass("workUnSelected").find(".workIcon").remove();
 	}	
+	
+	this.resize=function(){
+		calander?calander.resize():null;
+	}
+	
 	this.install();	
 }
 
@@ -368,6 +373,10 @@ function paibanAction(container){
 		computAllTdStatus();		
 		$(p).trigger("PART_SELECTED",{"startDay":start.getFullYear()+"-"+(start.getMonth()+1)+"-"+start.getDate(),"loopStep":loop});
 	}	
+	
+	this.resize=function(){
+		calander?calander.resize():null;
+	}
 	
 	this.install();	
 }
@@ -534,6 +543,17 @@ function CalanderObj(container,formatFun){
 	this.destroy=function(){
 		$(p).unbind();
 		calanderBox.del();
+	}
+	
+	this.resize=function(){
+		if(!calanderBox){
+			return;	
+		}
+		calanderBox.fillParent();
+		var H=calanderBox.height();
+		dateH=H-calanderTitleBox.outerHeight(true)-calanderDateBox.find("tr:eq(0)").outerHeight(); 
+		var RH=Math.floor(dateH/6);
+		calanderDateBox.find("tr:gt(0) td").setRealSize(null,RH);
 	}
 
 	this.install();

@@ -54,7 +54,7 @@ function ACTION(){
 		p.find(".dropToolBar a:not(.closebut)").bind("click",openAwindow); //按钮点击事件		
 		
 		//全局模糊检索
-		var dropOption=[{"text":"巡逻组","value":"groupLayer"},{"text":"350兆","value":"m350Layer"},{"text":"移动警务","value":"modelLayer"},{"text":"内保单位","value":"nbdwLayer"}];
+		var dropOption=[{"text":"移动警务","value":"modelLayer"},{"text":"内保单位","value":"nbdwLayer"}];
 		var gSearch=new globalSearch($("div.topSearchBox"),dropOption);//dropOption可以为空
 		gSearch.install();
 		$(gSearch).bind("GLOBAL_SEARCH",function(e,pobj){ //查询事件

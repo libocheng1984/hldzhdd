@@ -1,0 +1,67 @@
+<script type="text/javascript">
+//重要：初始化页面,页面内容加载完后,EasyUI格式化，之后执行ACTION方法，代替document.ready执行
+//重要：你无法保证#id或classname是唯一的，所以要用内置方法取html元素：p.find(selector) 保证只取到本页内的元素。
+//重要：你无法保证方法名不冲突，页面处置的方法要写在ACTION主方法内，this.方法名=function(){...}。
+//每一个页面会有自己的窗口id，用p.WINID获取，如果再点击出现子页面，并且子页面要返回父页面参数，那么将窗口id当作参数传到子窗口，子窗口用这个标记可以找到父窗体。
+function ACTION(){
+	var p=this;	
+	var Layout;   //布局对象
+	var CALANDER; //列表	
+	
+	//窗口缩放尺寸设置
+	this.resize=function(e,info){ 
+		p.find("#framelayout").fillParent(); 
+		Layout?Layout.resize():null;	
+		CALANDER?CALANDER.resize():null;		
+	}		
+	//销毁
+	this.DESTROY=function(){ 
+		if(Layout){
+			$(Layout).unbind();
+			Layout.destroy();
+			Layout=null;	
+		}
+		$(p.WINDOW).unbind("WINDOW_RESIZE",p.resize);
+	}
+	
+	this.READY=function(){	
+		//绑定窗体缩放事件		
+		$(p.WINDOW).bind("WINDOW_RESIZE",p.resize);	
+		
+		p.resize();			
+		//生成整体布局--------	
+		Layout=new frameLayout(p.find("#framelayout"));		
+		CALANDER=new CalanderObj(p.find(".fm_datePointSelector"));	
+		CALANDER.resize();
+		$(CALANDER).bind("DATE_ACTION",showDetail);
+                //当前日期
+               
+	}	
+	
+	//格式化独立事件绑定------------------------------------
+	function showDetail(e,dateVar){ 
+		//var date=dateVar.y+"-"+(dateVar.m+1)+"-"+dateVar.d;
+                var date=getDateStingForce2(new Date(dateVar.y,dateVar.m,dateVar.d));
+                var myDate = new Date();
+                var strdate =  myDate.getFullYear()+"-"+formatTo2((myDate.getMonth()+1))+"-"+formatTo2(myDate.getDate());
+                if(date>strdate)
+                {
+                    $.alert("选择日期不应该大于当前日期");
+                }
+		//更新列表
+		Layout.run("RenyuanContainer","loadDataGrid",{"date":date,"dateStr":dateVar["dateStr"]});
+	}
+
+}
+</script>
+<!--内容部分start-->
+<div id="framelayout" data-option="{'frameSet':'layoutFlex','flexdir':'x'}">
+  <div data-option="{'layoutType':'fixed','size':320}"  style="background-color: #e1f5ff;padding:4px;">   
+  <div class="pagetitle">请选择查询日期</div>
+    <div class="fm_datePointSelector disSelected" data-option="{'afterMonth':6,'beforeMonth':2,'editable':false}" style="background-color:#FFF"></div>
+  </div>    
+    <div id="RenyuanContainer" data-option="{'layoutType':'flex','flex':'1','url':'pages/mrzb/P_paiban_list.html'}" style="padding-left:6px">    
+  </div>  
+</div>
+
+<!--内容部分end--> 

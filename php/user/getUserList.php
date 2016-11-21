@@ -30,12 +30,13 @@
 	$event = isset ($_REQUEST['event']) ? $_REQUEST['event'] : "";
 	$content = isset ($_REQUEST['content']) ? $_REQUEST['content'] : "";
 	$extend = isset ($_REQUEST['extend']) ? $_REQUEST['extend'] : "";
-        $page = isset($_REQUEST['page'])?$_REQUEST['page'] : "1";
+  $page = isset($_REQUEST['page'])?$_REQUEST['page'] : "1";
 	$rows = isset($_REQUEST['rows'])?$_REQUEST['rows'] : "10";
 	//$content = Json_decode($content,true);
-	$orgCode="";$userid="";$username="";
+	$orgCode=isset($_REQUEST['orgCode'])?$_REQUEST['orgCode'] : "";
+	$userid="";$username="";
 	if(isset($content['condition'])){
-		$orgCode = isset($content['condition']['orgCode'])?$content['condition']['orgCode']:"";
+		$orgCode = isset($content['condition']['orgCode'])?$content['condition']['orgCode']:$orgCode;
                 $userid = isset($content['condition']['userid'])?$content['condition']['userid']:"";
                 $username = isset($content['condition']['username'])?iconv("UTF-8", "GBK", $content['condition']['username']):"";
 	}

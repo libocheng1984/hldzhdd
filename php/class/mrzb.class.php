@@ -363,4 +363,149 @@ class mrzb extends TpmsDB {
 
     return sprintf('%04X%04X%04X%04X%04X%04X%04X%04X', mt_rand(0, 65535), mt_rand(0, 65535), mt_rand(0, 65535), mt_rand(16384, 20479), mt_rand(32768, 49151), mt_rand(0, 65535), mt_rand(0, 65535), mt_rand(0, 65535));
 }
+
+
+ public function getmrzbList($date,$bzmc,$page,$rows,$orgCode)
+    {
+		$bRet = true;
+		$errMsg = "";
+		$row_count=0;
+                $orgCode=substr($orgCode,0,strpos($orgCode,"0000")).'%';
+		$result = array('result' =>false,'errmsg' =>'','records' => '');
+		$datas = array();
+		$arr=array('total'=>0,'rows' => $datas);
+		if ($this->dbconn == null)
+			$this->dbconn = $this->LogonDB();
+
+		 /*组成sql*/
+		$sql = "select count(a.id) ROWCOUNT from zdb_mrzbb a left join zdb_zbzb b on a.gid=b.id  left join zdb_organization c on b.orgcode=c.orgcode where to_char(a.sbsj,'YYYY-MM-DD')='$date' and b.orgcode like '$orgCode'";
+                    if ($bzmc != null&&$bzmc != "") {
+		$sql .=  " and b.zbzdh like '%$bzmc%'";
+                        //echo $sql;
+		}
+				
+	        //echo $sql;
+		$stmt = oci_parse($this->dbconn, $sql);
+		oci_define_by_name($stmt,"ROWCOUNT",$row_count);
+		if (!@oci_execute($stmt)) {
+	  		$bRet = false;
+	  		$errMsg="查询失败";
+		}else{
+			
+		 /*处理分页*/
+			oci_fetch($stmt);
+			$total_rec = $row_count;
+			oci_free_statement($stmt);
+    	
+			/*查询*/
+			if ($this->dbconn == null)
+			$this->dbconn = $this->LogonDB();
+                        //$sql=str_replace("select count(distinct a.id) ROWCOUNT","select a.id,a.zbzdh,a.zzzh,a.zzxm,wm_concat(b.username) zyxm",$sql);
+                        
+                        $sql=str_replace("select count(a.id) ROWCOUNT","select a.id,a.gid,b.zbzdh,b.zzzh,b.zzxm,b.orgcode,c.orgname",$sql);
+			
+                        // echo $sql;
+			$sql = pageResultSet($sql, $page, $rows);
+			
+			$stmt = oci_parse($this->dbconn, $sql);
+			if (!@oci_execute($stmt)) {
+				$bRet = false;
+				$errMsg="查询失败";
+			}else{
+				while (($row = oci_fetch_assoc($stmt)) != false) {
+					$data = array(
+						'GID' => iconv("GBK", "UTF-8", $row["GID"]),
+                                                'BANZHU' => iconv("GBK", "UTF-8", $row["ZBZDH"]),
+                                                'JINGHAO' => '',                             
+                                                'XINGMING' => '',
+                                                'DIANHUA'=> '',
+                                                'BUMEN' => iconv("GBK", "UTF-8", $row["ORGNAME"])
+						
+       				);
+		   			array_push($datas, $data);
+                                 $datas=$this->getzcy($datas, $data['GID'], $data['BUMEN']);
+	  		}
+	  			oci_free_statement($stmt);
+	  			@oci_close($this->dbconn);
+				$arr=array('total'=>$total_rec,'rows' => $datas);
+			}
+		}
+		$result = array('result' =>$bRet,'errmsg' =>$errMsg,'records' => $arr);
+		return $result;
+	  
+    }
+    public function getzcy($datas,$gid,$orgname)
+    {
+                        $sql =  " select a.id,a.ryzh,a.cylx,b.username,b.alarm,b.telephone from zdb_zbzcyb a left join zdb_user b on a.ryzh=b.userid where gid='$gid'";
+                       //echo $sql;
+			$stmt = oci_parse($this->dbconn, $sql);
+			if (!@oci_execute($stmt)) {
+				$bRet = false;
+				$errMsg="查询失败";
+			}else{
+				while (($row = oci_fetch_assoc($stmt)) != false) {
+					$data = array(
+						'GID' => iconv("GBK", "UTF-8", $row["ID"]),
+                                                '_parentId' => $gid,
+                                                'BANZHU' => $row["CYLX"]=='1'?"组成员":"值班长",
+                                                'JINGHAO' =>  iconv("GBK", "UTF-8", $row["ALARM"]),                             
+                                                'XINGMING' => iconv("GBK", "UTF-8", $row["USERNAME"]),
+                                                'DIANHUA'=> iconv("GBK", "UTF-8", $row["TELEPHONE"]),
+                                                'BUMEN' => $orgname
+						
+       				);
+		   			array_push($datas, $data);
+	  		}
+	  			oci_free_statement($stmt);
+	  			oci_close($this->dbconn);
+				
+			}
+		
+		
+		return $datas;
+	  
+    }
+    
+  /*
+ * 查询用户值班
+ * 
+ */
+  public function getMyPaiban($ryzh){
+		$bRet = true;
+		$errMsg = "";
+		$men = null;
+		if ($this->dbconn == null)
+			$this->dbconn = $this->LogonDB();
+
+		$sql = "select a.ryzh,b.zbzdh,b.zbqsrq,b.zbjgts from ZDB_ZBZCYB a left join zdb_zbzb b on b.id=a.gid where a.ryzh='$ryzh'";
+
+		$stmt = oci_parse($this->dbconn, $sql);
+
+		if (!@ oci_execute($stmt)) {
+			$bRet = false;
+			echo getOciError($stmt);
+			oci_close($this->dbconn);
+			$errMsg = '查询失败';
+		} else {
+			//$mens = array ();
+			while (($row = oci_fetch_assoc($stmt)) != false) {
+                                $mentime = array(
+                                    'startDay' => iconv("GBK", "UTF-8", $row["ZBQSRQ"]),
+                                    'loopStep' => iconv("GBK", "UTF-8", $row["ZBJGTS"])
+                                    );
+				$men = array (
+					'ID' => iconv("GBK", "UTF-8", $row["RYZH"]),
+                                        'BANZHUMINGCHENG' => iconv("GBK", "UTF-8", $row["ZBZDH"]),
+                                         'PAIBANGUIZHE' => $mentime
+				
+				);
+				//array_push($mens, $men);
+			}
+		}
+		oci_free_statement($stmt);
+		oci_close($this->dbconn);
+                
+		return $men;
+	} 
+
 }
